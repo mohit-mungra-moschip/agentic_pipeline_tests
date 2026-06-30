@@ -141,8 +141,8 @@ def update_excel_report(pr_url):
             return False
 
         jira_id_idx = None
-        if "Jira ID" in headers:
-            jira_id_idx = headers.index("Jira ID") + 1
+        if "Jira Link" in headers:
+            jira_id_idx = headers.index("Jira Link") + 1
 
         pr_link_idx = None
         if "PR Link" in headers:
@@ -212,6 +212,24 @@ def main():
         print("[+] All reports updated successfully.")
     else:
         print("[-] Report update finished with no changes.")
+
+    # Send pipeline report email after reports have been patched with the PR URL
+    try:
+        from utils.mailer import send_pipeline_report
+        base_dir = Path(".")
+        if not (base_dir / "reports").exists() and (base_dir.parent / "reports").exists():
+            base_dir = base_dir.parent
+        summary_path = base_dir / "reports/ai_summary.json"
+        if summary_path.exists():
+            print(f"[*] Loading summary to send report email: {summary_path}")
+            state = json.loads(summary_path.read_text(encoding="utf-8"))
+            state["pr_links"] = [args.pr_url]
+            send_pipeline_report(state, run_id)
+            print("[+] Pipeline report email sent successfully post-PR update.")
+        else:
+            print(f"[!] Summary file not found at {summary_path}. Cannot send post-PR email.")
+    except Exception as e:
+        print(f"[x] Error sending post-PR email: {e}")
 
 if __name__ == "__main__":
     main()

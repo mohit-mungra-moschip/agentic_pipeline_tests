@@ -25,7 +25,7 @@ RECEIVER_EMAILS = [
     "mohit.mungra@moschip.com",
 ]
 
-JIRA_BASE_URL    = "https://moschiptech.atlassian.net/browse"
+JIRA_BASE_URL    = "https://moschip-team-doibg33r.atlassian.net/browse"
 GITHUB_REPO_URL  = "https://github.com/mohit-mungra-moschip/agentic_pipeline"
 
 
@@ -304,7 +304,7 @@ def _build_html(state: dict, run_id: str) -> str:
     approved_fixes     = state.get("approved_fixes") or []
     root_cause         = state.get("root_cause") or {}
     pr_links           = state.get("pr_links") or []
-    overall_confidence = state.get("overall_confidence", 0)
+    overall_confidence = state.get("overall_confidence") or state.get("summary", {}).get("overall_confidence", 0)
 
     # Root Cause
     root_html = ""
@@ -355,17 +355,6 @@ def _build_html(state: dict, run_id: str) -> str:
     pipeline_details_table = ""
     run_url = f"{GITHUB_REPO_URL}/actions/runs/{run_id}"
     if healing_type != "NONE" or pr_links:
-        if pr_links:
-            url = pr_links[0]
-            pr_num = ""
-            if "/pull/" in url:
-                pr_num = url.rstrip('/').split('/')[-1]
-            pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "Open Pull Request"
-            pr_val = _link(url, pr_text, "#7c3aed")
-        else:
-            repo = "agentic_pipeline_tests" if healing_type == "TEST_HEAL" else "agentic_pipeline"
-            fallback_url = f"https://github.com/mohit-mungra-moschip/{repo}/tree/ai-fix/app-{run_id}"
-            pr_val = _link(fallback_url, "Open PR / Branch", "#7c3aed")
         pipeline_details_table = f"""
         <div style="margin:24px 0 10px; border-top:1px solid #cbd5e1; padding-top:15px;">
             <h4 style="color: #1e3a8a; margin: 0 0 8px 0; font-size: 13px; font-weight: bold; text-transform: uppercase;">Pipeline details</h4>
@@ -383,10 +372,6 @@ def _build_html(state: dict, run_id: str) -> str:
                 <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">{overall_confidence}%</td>
               </tr>
               {files_html}
-              <tr style="background:#f8fafc;">
-                <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: bold; color:#475569;">Pull Request</td>
-                <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">{pr_val}</td>
-              </tr>
             </table>
         </div>"""
 

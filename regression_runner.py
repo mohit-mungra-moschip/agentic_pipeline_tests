@@ -207,11 +207,12 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
         _update_html_and_excel_reports(final, run_id)
 
         # Send pipeline report email (non-blocking — failure won't abort the run)
-        try:
-            from utils.mailer import send_pipeline_report
-            send_pipeline_report(final, run_id)
-        except Exception as mail_exc:
-            console.print(f"  [yellow]⚠️  Mailer skipped: {mail_exc}[/yellow]")
+        if not os.getenv("GITHUB_ACTIONS"):
+            try:
+                from utils.mailer import send_pipeline_report
+                send_pipeline_report(final, run_id)
+            except Exception as mail_exc:
+                console.print(f"  [yellow]⚠️  Mailer skipped: {mail_exc}[/yellow]")
 
         if final.get("healing_successful") or final.get("test_passed"):
             console.print("\n[bold green]✅ Pipeline complete — all issues resolved.[/bold green]")

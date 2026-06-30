@@ -1106,8 +1106,7 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                 "Message": message,
                 "Suggested Fix": suggested_fix,
                 "Short Summary": short_summary,
-                "Jira ID": jira_id,
-                "Jira Link": jira_link,
+                "Jira Link": f'=HYPERLINK("{jira_link}","{jira_id}")' if (jira_id and jira_link) else (jira_id or ""),
                 "PR Link": pr_link,
                 "Screenshot": screenshot_path,
                 "Executed At": datetime.now().strftime("%Y_%m_%d-%H_%M_%S"),
@@ -1428,8 +1427,7 @@ def _apply_dynamic_column_widths(ws, df, header_row=1, data_start_row=2):
         "Executed At": {"min": 15, "max": 25},
         "Suggested Fix": {"min": 40, "max": 120},
         "Short Summary": {"min": 40, "max": 120},
-        "Jira ID": {"min": 15, "max": 25},
-        "Jira Link": {"min": 30, "max": 80},
+        "Jira Link": {"min": 15, "max": 25},
     }
 
     column_widths = {}
@@ -1836,7 +1834,6 @@ def _create_excel_report(test_results, output_file):
     tcid_idx = df.columns.get_loc("Test Case ID") + 1
     fix_idx = df.columns.get_loc("Suggested Fix") + 1 if "Suggested Fix" in df.columns else None
     summary_idx = df.columns.get_loc("Short Summary") + 1 if "Short Summary" in df.columns else None
-    jira_id_idx = df.columns.get_loc("Jira ID") + 1 if "Jira ID" in df.columns else None
     jira_link_idx = df.columns.get_loc("Jira Link") + 1 if "Jira Link" in df.columns else None
     msg_idx = df.columns.get_loc("Message") + 1 if "Message" in df.columns else None
 
@@ -1844,23 +1841,19 @@ def _create_excel_report(test_results, output_file):
 
     for r, row in enumerate(dataframe_to_rows(df, index=False, header=False), start=2):
         ws_details.append(row)
-        _apply_status_row_style(ws_details, r, status_idx, jira_id_idx, pr_link_idx)
+        # _apply_status_row_style(ws_details, r, status_idx, jira_link_idx, pr_link_idx)
+        _apply_status_row_style(ws_details, r, status_idx, jira_link_idx, pr_link_idx)
         
         # Standardize all columns to wrap text and align top-left
         for col_idx in range(1, ws_details.max_column + 1):
             ws_details.cell(row=r, column=col_idx).alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
             
-        # Jira ID / Link — single-click HYPERLINK formula in the Jira ID column
-        if jira_id_idx and jira_link_idx:
-            id_cell = ws_details.cell(row=r, column=jira_id_idx)
-            link_cell = ws_details.cell(row=r, column=jira_link_idx)
-            jira_id = id_cell.value
-            url = link_cell.value
-            if jira_id and url and str(url).startswith("http"):
-                safe_url = str(url).replace('"', '')
-                id_cell.value = f'=HYPERLINK("{safe_url}","{jira_id}")'
-                id_cell.font = Font(color="0563C1", underline="single", bold=True)
-                link_cell.value = ""
+        # Jira Link — single-click HYPERLINK formula formatting
+        if jira_link_idx:
+            cell = ws_details.cell(row=r, column=jira_link_idx)
+            val = cell.value
+            if val and str(val).startswith("=HYPERLINK"):
+                cell.font = Font(color="0563C1", underline="single", bold=True)
 
         # PR Link — single-click HYPERLINK formula
         if pr_link_idx:
@@ -1901,7 +1894,6 @@ def _create_excel_report(test_results, output_file):
         output_idx = fdf.columns.get_loc("Expected Output") + 1 if "Expected Output" in fdf.columns else None
         fix_idx = fdf.columns.get_loc("Suggested Fix") + 1 if "Suggested Fix" in fdf.columns else None
         summary_idx = fdf.columns.get_loc("Short Summary") + 1 if "Short Summary" in fdf.columns else None
-        jira_id_idx_f = fdf.columns.get_loc("Jira ID") + 1 if "Jira ID" in fdf.columns else None
         jira_link_idx_f = fdf.columns.get_loc("Jira Link") + 1 if "Jira Link" in fdf.columns else None
         msg_idx_f = fdf.columns.get_loc("Message") + 1 if "Message" in fdf.columns else None
 
@@ -1913,17 +1905,12 @@ def _create_excel_report(test_results, output_file):
             for col_idx in range(1, ws_failed.max_column + 1):
                 ws_failed.cell(row=r, column=col_idx).alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
                 
-            # Jira ID / Link — single-click HYPERLINK formula in the Jira ID column
-            if jira_id_idx_f and jira_link_idx_f:
-                id_cell = ws_failed.cell(row=r, column=jira_id_idx_f)
-                link_cell = ws_failed.cell(row=r, column=jira_link_idx_f)
-                jira_id = id_cell.value
-                url = link_cell.value
-                if jira_id and url and str(url).startswith("http"):
-                    safe_url = str(url).replace('"', '')
-                    id_cell.value = f'=HYPERLINK("{safe_url}","{jira_id}")'
-                    id_cell.font = Font(color="0563C1", underline="single", bold=True)
-                    link_cell.value = ""
+            # Jira Link — single-click HYPERLINK formula formatting
+            if jira_link_idx_f:
+                cell = ws_failed.cell(row=r, column=jira_link_idx_f)
+                val = cell.value
+                if val and str(val).startswith("=HYPERLINK"):
+                    cell.font = Font(color="0563C1", underline="single", bold=True)
 
         ws_failed.freeze_panes = "D2"
         ws_failed.auto_filter.ref = ws_failed.dimensions
