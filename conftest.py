@@ -472,7 +472,16 @@ def _build_html(payload: dict, json_filename: str) -> str:
 
     let prHtml = '';
     if (item.pr_url) {{
-      prHtml = `<a href="${{esc(item.pr_url)}}" target="_blank" rel="noopener noreferrer" style="flex-shrink:0;font-size:.62rem;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.04em;padding:2px 7px;border-radius:4px;white-space:nowrap;border:1px solid #e9d5ff;background:#f5f3ff;color:#7c3aed;text-decoration:none;display:inline-flex;align-items:center;margin-left:5px;" onclick="event.stopPropagation();">PR Link</a>`;
+      let prText = 'PR Link';
+      let prUrlClean = item.pr_url.replace(/\/+$/, "");
+      if (prUrlClean.includes('/pull/')) {{
+        const parts = prUrlClean.split('/');
+        const prNum = parts[parts.length - 1];
+        if (prNum && !isNaN(prNum)) {{
+          prText = `PR #${{prNum}}`;
+        }}
+      }}
+      prHtml = `<a href="${{esc(item.pr_url)}}" target="_blank" rel="noopener noreferrer" style="flex-shrink:0;font-size:.62rem;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.04em;padding:2px 7px;border-radius:4px;white-space:nowrap;border:1px solid #e9d5ff;background:#f5f3ff;color:#7c3aed;text-decoration:none;display:inline-flex;align-items:center;margin-left:5px;" onclick="event.stopPropagation();">${{esc(prText)}}</a>`;
     }}
 
     const highlightCls = (item.jira_id || item.pr_url) ? 'has-traceability' : '';

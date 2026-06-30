@@ -94,7 +94,7 @@ def update_json_and_html(run_id, pr_url):
                     if html_path.exists():
                         content = html_path.read_text(encoding="utf-8")
                         import re
-                        pattern = r'https://github\.com/softnauticsgithub/[a-zA-Z0-9_-]+/tree/ai-fix/[a-zA-Z0-9_-]+'
+                        pattern = r'https://github\.com/(softnauticsgithub|mohit-mungra-moschip)/[a-zA-Z0-9_-]+/tree/ai-fix/[a-zA-Z0-9_-]+'
                         new_content = re.sub(pattern, pr_url, content)
                         html_path.write_text(new_content, encoding="utf-8")
                         print(f"[+] HTML report patched directly via regex replacement.")
@@ -168,7 +168,11 @@ def update_excel_report(pr_url):
             is_healed = (status == "PASSED" and has_jira) or (pr_val and "ai-fix" in str(pr_val))
             if is_healed:
                 safe_url = str(pr_url).replace('"', '')
-                pr_cell.value = f'=HYPERLINK("{safe_url}","Open PR")'
+                pr_num = ""
+                if "/pull/" in safe_url:
+                    pr_num = safe_url.rstrip('/').split('/')[-1]
+                pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR Link"
+                pr_cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                 pr_cell.font = Font(color="7C3AED", underline="single", bold=True)
                 
                 fill = PatternFill("solid", "E8DFFF")

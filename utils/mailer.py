@@ -26,7 +26,7 @@ RECEIVER_EMAILS = [
 ]
 
 JIRA_BASE_URL    = "https://moschiptech.atlassian.net/browse"
-GITHUB_REPO_URL  = "https://github.com/softnauticsgithub/agentic_solution"
+GITHUB_REPO_URL  = "https://github.com/mohit-mungra-moschip/agentic_pipeline"
 
 
 # =============================================================================
@@ -258,7 +258,11 @@ def _build_html(state: dict, run_id: str) -> str:
                 
             # PR link
             if pr_url:
-                pr_lbl = f'<a href="{pr_url}" style="color:#7c3aed; text-decoration:none; font-weight:600;">Open PR</a>'
+                pr_num = ""
+                if "/pull/" in pr_url:
+                    pr_num = pr_url.rstrip('/').split('/')[-1]
+                pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR Link"
+                pr_lbl = f'<a href="{pr_url}" style="color:#7c3aed; text-decoration:none; font-weight:600;">{pr_text}</a>'
             else:
                 pr_lbl = '<span style="color:#94a3b8;">—</span>'
                 
@@ -352,10 +356,15 @@ def _build_html(state: dict, run_id: str) -> str:
     run_url = f"{GITHUB_REPO_URL}/actions/runs/{run_id}"
     if healing_type != "NONE" or pr_links:
         if pr_links:
-            pr_val = _link(pr_links[0], "Open Pull Request", "#7c3aed")
+            url = pr_links[0]
+            pr_num = ""
+            if "/pull/" in url:
+                pr_num = url.rstrip('/').split('/')[-1]
+            pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "Open Pull Request"
+            pr_val = _link(url, pr_text, "#7c3aed")
         else:
-            repo = "agentic_solution_tests" if healing_type == "TEST_HEAL" else "agentic_solution"
-            fallback_url = f"https://github.com/softnauticsgithub/{repo}/tree/ai-fix/app-{run_id}"
+            repo = "agentic_pipeline_tests" if healing_type == "TEST_HEAL" else "agentic_pipeline"
+            fallback_url = f"https://github.com/mohit-mungra-moschip/{repo}/tree/ai-fix/app-{run_id}"
             pr_val = _link(fallback_url, "Open PR / Branch", "#7c3aed")
         pipeline_details_table = f"""
         <div style="margin:24px 0 10px; border-top:1px solid #cbd5e1; padding-top:15px;">

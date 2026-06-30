@@ -377,8 +377,8 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                             result["pr_url"] = state.get("pr_links")[0]
                         else:
                             h_type = state.get("healing_type", "APP_HEAL")
-                            repo = "agentic_solution_tests" if h_type == "TEST_HEAL" else "agentic_solution"
-                            result["pr_url"] = f"https://github.com/softnauticsgithub/{repo}/tree/ai-fix/app-{run_id}"
+                            repo = "agentic_pipeline_tests" if h_type == "TEST_HEAL" else "agentic_pipeline"
+                            result["pr_url"] = f"https://github.com/mohit-mungra-moschip/{repo}/tree/ai-fix/app-{run_id}"
                     
                     cls = class_map.get(test_id) or class_map.get(test_name)
                     if cls:

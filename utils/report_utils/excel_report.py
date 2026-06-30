@@ -1093,8 +1093,8 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                 elif ai_state.get("run_id"):
                     run_id = ai_state.get("run_id")
                     h_type = ai_state.get("healing_type", "APP_HEAL")
-                    repo = "agentic_solution_tests" if h_type == "TEST_HEAL" else "agentic_solution"
-                    pr_link = f"https://github.com/softnauticsgithub/{repo}/tree/ai-fix/app-{run_id}"
+                    repo = "agentic_pipeline_tests" if h_type == "TEST_HEAL" else "agentic_pipeline"
+                    pr_link = f"https://github.com/mohit-mungra-moschip/{repo}/tree/ai-fix/app-{run_id}"
 
             results.append({
                 **module_info,
@@ -1850,22 +1850,29 @@ def _create_excel_report(test_results, output_file):
         for col_idx in range(1, ws_details.max_column + 1):
             ws_details.cell(row=r, column=col_idx).alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
             
-        # Jira Link — single-click HYPERLINK formula
-        if jira_link_idx:
-            cell = ws_details.cell(row=r, column=jira_link_idx)
-            url = cell.value
-            if url and str(url).startswith("http"):
+        # Jira ID / Link — single-click HYPERLINK formula in the Jira ID column
+        if jira_id_idx and jira_link_idx:
+            id_cell = ws_details.cell(row=r, column=jira_id_idx)
+            link_cell = ws_details.cell(row=r, column=jira_link_idx)
+            jira_id = id_cell.value
+            url = link_cell.value
+            if jira_id and url and str(url).startswith("http"):
                 safe_url = str(url).replace('"', '')
-                cell.value = f'=HYPERLINK("{safe_url}","Open in Jira")'
-                cell.font = Font(color="0563C1", underline="single", bold=True)
-                
+                id_cell.value = f'=HYPERLINK("{safe_url}","{jira_id}")'
+                id_cell.font = Font(color="0563C1", underline="single", bold=True)
+                link_cell.value = ""
+
         # PR Link — single-click HYPERLINK formula
         if pr_link_idx:
             cell = ws_details.cell(row=r, column=pr_link_idx)
             url = cell.value
             if url and str(url).startswith("http"):
                 safe_url = str(url).replace('"', '')
-                cell.value = f'=HYPERLINK("{safe_url}","Open PR")'
+                pr_num = ""
+                if "/pull/" in safe_url:
+                    pr_num = safe_url.rstrip('/').split('/')[-1]
+                pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR Link"
+                cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                 cell.font = Font(color="7C3AED", underline="single", bold=True)
 
     ws_details.freeze_panes = "D2"
@@ -1906,14 +1913,17 @@ def _create_excel_report(test_results, output_file):
             for col_idx in range(1, ws_failed.max_column + 1):
                 ws_failed.cell(row=r, column=col_idx).alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
                 
-            # Jira Link — single-click HYPERLINK formula
-            if jira_link_idx_f:
-                cell = ws_failed.cell(row=r, column=jira_link_idx_f)
-                url = cell.value
-                if url and str(url).startswith("http"):
+            # Jira ID / Link — single-click HYPERLINK formula in the Jira ID column
+            if jira_id_idx_f and jira_link_idx_f:
+                id_cell = ws_failed.cell(row=r, column=jira_id_idx_f)
+                link_cell = ws_failed.cell(row=r, column=jira_link_idx_f)
+                jira_id = id_cell.value
+                url = link_cell.value
+                if jira_id and url and str(url).startswith("http"):
                     safe_url = str(url).replace('"', '')
-                    cell.value = f'=HYPERLINK("{safe_url}","Open in Jira")'
-                    cell.font = Font(color="0563C1", underline="single", bold=True)
+                    id_cell.value = f'=HYPERLINK("{safe_url}","{jira_id}")'
+                    id_cell.font = Font(color="0563C1", underline="single", bold=True)
+                    link_cell.value = ""
 
         ws_failed.freeze_panes = "D2"
         ws_failed.auto_filter.ref = ws_failed.dimensions

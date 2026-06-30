@@ -129,7 +129,7 @@ def _create_failure_ticket(
         healed_badge  = "✅ AI-Healed" if heal_status == "healed" else "❌ Unhealed"
         issue_summary = f"[RegressionAI] {healed_badge} | {test_name[:80]} — {bug_type}"
 
-        repo = os.getenv("GITHUB_REPOSITORY", "softnauticsgithub/agentic_solution")
+        repo = os.getenv("GITHUB_REPOSITORY", "mohit-mungra-moschip/agentic_pipeline")
         server_url = os.getenv("GITHUB_SERVER_URL", "https://github.com")
 
         if run_id and run_id.isdigit():
@@ -142,10 +142,6 @@ def _create_failure_ticket(
         else:
             commit_link = f"`{commit_sha[:8]}`" if commit_sha else "`unknown`"
 
-        applied_fixes_text = ""
-        if heal_status == "healed" and approved_fixes:
-            applied_fixes_text = _format_applied_fixes(approved_fixes) + "\n\n"
-
         description = (
             f"*GitHub Pipeline Run:* {run_link}\n\n"
             f"*Failed Test:* `{test_name}`\n"
@@ -154,8 +150,6 @@ def _create_failure_ticket(
             f"*Likely Root Cause Commit:* {commit_link}\n\n"
             f"h3. AI Analysis\n{ai_summary}\n\n"
             f"h3. Suggested Fix\n{suggested_fix}\n\n"
-            f"{applied_fixes_text}"
-            f"h3. Error Message\n{{code}}{error_message[:500]}{{code}}\n\n"
             f"_Ticket auto-created by RegressionAI pipeline._"
         )
 
@@ -214,7 +208,7 @@ def _create_env_ticket(
     try:
         jira = _get_jira_client()
 
-        repo = os.getenv("GITHUB_REPOSITORY", "softnauticsgithub/agentic_solution")
+        repo = os.getenv("GITHUB_REPOSITORY", "mohit-mungra-moschip/agentic_pipeline")
         server_url = os.getenv("GITHUB_SERVER_URL", "https://github.com")
 
         if run_id and run_id.isdigit():
@@ -226,7 +220,6 @@ def _create_env_ticket(
             f"*GitHub Pipeline Run:* {run_link}\n\n"
             f"*Affected Test:* `{test_name}`\n"
             f"*Classification:* ENV_ISSUE (not auto-fixable)\n\n"
-            f"h3. Error Message\n{{code}}{error_message[:500]}{{code}}\n\n"
             f"h3. Remediation Hint\n{remediation}\n\n"
             f"_Ticket auto-created by RegressionAI pipeline._"
         )
