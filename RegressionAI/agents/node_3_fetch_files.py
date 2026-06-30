@@ -1,0 +1,138 @@
+"""
+RegressionAI/agents/fetch_files.py — Fetch relevant source files for failed tests.
+Adapted from QAOps for the RegressionAI pipeline.
+"""
+import os
+import re
+from pathlib import Path
+from rich.console import Console
+from common_utils.logger import get_logger
+from RegressionAI.state import AgentState
+
+console = Console()
+log = get_logger("fetch_files")
+
+MAX_FILE_SIZE = 8000  # chars per file
+MAX_FILES = 15
+
+
+def _read_file(path: Path) -> str:
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+        return content[:MAX_FILE_SIZE]
+    except Exception:
+        return ""
+
+
+def _resolve_associated_source_files(test_file: str, project_path: Path) -> list:
+    associated = []
+    # Clean the test name to find keywords (e.g., test_api_users.py -> users)
+    base = Path(test_file).stem.replace("test_api_", "").replace("test_", "")
+    keywords = [k for k in base.split("_") if k and len(k) > 2]
+    
+    # Walk directory to find python files in app/routers matching the keywords
+    for root, dirs, files in os.walk(project_path):
+        dirs[:] = [d for d in dirs if d not in (".venv", "tests", ".git", "__pycache__", "build", "dist")]
+        for file in files:
+            if file.endswith(".py"):
+                file_stem = Path(file).stem
+                # Limit keyword matching to router/controller files to avoid fetching database/model internals
+                if "router" in root or "controllers" in root or "app" in root:
+                    if any(kw in file_stem for kw in keywords):
+                        rel = os.path.relpath(os.path.join(root, file), project_path)
+                        associated.append(rel)
+                        
+    return associated
+
+
+def _resolve_full_path(rel_path: str, project_path: Path) -> Path:
+    p = Path(rel_path)
+    if p.is_absolute() and p.exists():
+        return p
+    p = project_path / rel_path
+    if p.exists():
+        return p
+    p = project_path.parent / rel_path
+    if p.exists():
+        return p
+    parts = Path(rel_path).parts
+    if len(parts) >= 2:
+        for child in project_path.parent.iterdir():
+            if child.is_dir() and child.name != project_path.name:
+                candidate = child / Path(*parts[1:])
+                if candidate.exists():
+                    return candidate
+                candidate2 = child / rel_path
+                if candidate2.exists():
+                    return candidate2
+    return project_path / rel_path
+
+
+def _extract_files_from_traceback(traceback: str, project_path: Path) -> list:
+    """Extract any valid python files mentioned in the traceback text."""
+    found = []
+    # Match patterns like: "tests/e2e/test_full_workflow.py:72" or "app/routers/users.py"
+    matches = re.findall(r"([\w/\\.-]+\.py)", traceback)
+    for m in matches:
+        if _resolve_full_path(m, project_path).exists() and m not in found:
+            # Avoid external/venv paths
+            if not any(part in m for part in (".venv", "site-packages", "Python.framework")):
+                found.append(m)
+    return found
+
+
+def fetch_files(state: AgentState) -> dict:
+    """Collect all source files referenced in failures."""
+    failures = state.get("failures", [])
+    project_path = Path(state.get("project_path", "."))
+
+    console.print(f"\n[bold blue]📁 Fetch Files[/bold blue]")
+
+    paths_to_fetch = set()
+
+    for f in failures:
+        if f.get("file_path"):
+            paths_to_fetch.add(f["file_path"])
+            # Resolve associated source files dynamically (e.g., routers)
+            for src in _resolve_associated_source_files(f["file_path"], project_path):
+                paths_to_fetch.add(src)
+        
+        # Extract files directly from the execution traceback
+        if f.get("traceback"):
+            for tb_file in _extract_files_from_traceback(f["traceback"], project_path):
+                paths_to_fetch.add(tb_file)
+
+        for src in f.get("source_files", []):
+            if src:
+                paths_to_fetch.add(src)
+
+    # Automatically resolve core application dependencies from imports (e.g. schemas, crud, models)
+    dependencies = set()
+    for rel_path in paths_to_fetch:
+        full = _resolve_full_path(rel_path, project_path)
+        if full.exists():
+            try:
+                content = full.read_text(encoding="utf-8", errors="replace")
+                for line in content.splitlines():
+                    if "from app" in line or "import app" in line:
+                        for mod in ["crud", "schemas", "models", "database"]:
+                            if mod in line:
+                                rel_mod = f"app/{mod}.py"
+                                if (project_path / rel_mod).exists():
+                                    dependencies.add(rel_mod)
+            except Exception:
+                pass
+    paths_to_fetch.update(dependencies)
+
+    relevant: dict = {}
+    for rel_path in list(paths_to_fetch)[:MAX_FILES]:
+        full = _resolve_full_path(rel_path, project_path)
+        if full.exists():
+            content = _read_file(full)
+            relevant[rel_path] = content
+            console.print(f"   📄 {rel_path} ({len(content)} chars)")
+        else:
+            log.warning(f"File not found: {rel_path}")
+
+    console.print(f"   ✅ Fetched {len(relevant)} file(s)")
+    return {"relevant_files": relevant, "status": "self_healing"}
