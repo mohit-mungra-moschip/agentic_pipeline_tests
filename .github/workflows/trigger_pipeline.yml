@@ -1,0 +1,34 @@
+name: 🔔 Trigger RegressionAI Pipeline
+
+# Fires on every push to main in the test repo.
+# Dispatches a repository_dispatch event to agentic_pipeline to run the full pipeline
+# with Jira creation enabled and 3 healing iterations.
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-pipeline:
+    name: Dispatch to RegressionAI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚀 Trigger agentic_pipeline regression workflow
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.TEST_REPO_TOKEN }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'mohit-mungra-moschip',
+              repo:  'agentic_pipeline',
+              event_type: 'test-repo-push',
+              client_payload: {
+                triggered_by: 'agentic_pipeline_tests',
+                ref:          context.ref,
+                sha:          context.sha,
+                actor:        context.actor,
+              }
+            });
+            console.log('✅ Dispatch sent to agentic_pipeline — pipeline will start with create_jira=true, max_iter=3');
