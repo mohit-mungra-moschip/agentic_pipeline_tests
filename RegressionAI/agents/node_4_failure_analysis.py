@@ -99,8 +99,8 @@ def call_llm_with_progress(func, *args, **kwargs):
     return result_container[0]
 
 
-def _classify_failures_batch(failures: list) -> list:
-    """Call LLM to classify all test failures in a single batch request."""
+def _classify_failures_single_chunk(failures: list) -> list:
+    """Call LLM to classify a chunk of test failures."""
     ai = AIWrapper(LLMConfig(model=FAILURE_ANALYSIS_MODEL, temperature=0.1), mode="llm")
 
     failures_list = []
@@ -183,6 +183,17 @@ Test Failures to Classify:
             ))
             
     return classifications
+
+
+def _classify_failures_batch(failures: list) -> list:
+    """Call LLM to classify all test failures in small batches of max 5 to prevent token limits."""
+    chunk_size = 5
+    all_classifications = []
+    for i in range(0, len(failures), chunk_size):
+        chunk = failures[i:i+chunk_size]
+        chunk_classifications = _classify_failures_single_chunk(chunk)
+        all_classifications.extend(chunk_classifications)
+    return all_classifications
 
 
 def _classify_failures_parallel(failures: list) -> list:

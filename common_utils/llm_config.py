@@ -200,6 +200,9 @@ def _make_single_llm(provider: str, model: str, api_key: str,
     Instantiate a single LangChain chat model.
     'model' must already have its provider prefix stripped (done by get_llm).
     """
+    if provider in ("openai", "anthropic", "google", "groq", "openrouter"):
+        kwargs.setdefault("timeout", 30.0)
+
     if provider == "openai":
         try:
             from langchain_openai import ChatOpenAI
