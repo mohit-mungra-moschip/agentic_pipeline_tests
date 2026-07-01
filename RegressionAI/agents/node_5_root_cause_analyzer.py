@@ -97,16 +97,23 @@ def root_cause_commit_analysis(state: AgentState) -> dict:
             primary_failure = failures[i]
             break
 
+    # Determine the target git directory and file path
+    target_git_dir = project_path
+    rel_file_path = primary_failure.get("file_path", "")
+    if rel_file_path and rel_file_path.startswith("test_framework/"):
+        target_git_dir = os.path.join(project_path, "test_framework")
+        rel_file_path = rel_file_path[len("test_framework/"):]
+
     # Gather git context
     console.print("   → Collecting git history...")
-    recent_commits = _get_recent_commits(project_path, n=10)
-    changed_files = _get_changed_files_per_commit(project_path, n=5)
+    recent_commits = _get_recent_commits(target_git_dir, n=10)
+    changed_files = _get_changed_files_per_commit(target_git_dir, n=5)
 
     blame_output = ""
-    if primary_failure.get("file_path"):
+    if rel_file_path:
         blame_output = _git_blame_file(
-            project_path,
-            primary_failure["file_path"],
+            target_git_dir,
+            rel_file_path,
             primary_failure.get("line_number"),
         )
 
@@ -142,7 +149,7 @@ GIT BLAME OUTPUT (failing file):
         commit_msg = parsed.get("commit_message", "unknown")
         
         if sha != "unknown" and len(sha) >= 7:
-            git_info = _run_git(["git", "log", "-1", "--pretty=format:%ad|%B", "--date=short", sha], project_path)
+            git_info = _run_git(["git", "log", "-1", "--pretty=format:%ad|%B", "--date=short", sha], target_git_dir)
             if git_info and "|" in git_info:
                 parts = git_info.split("|", 1)
                 date_str = parts[0].strip()
