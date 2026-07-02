@@ -81,6 +81,98 @@ def _extract_files_from_traceback(traceback: str, project_path: Path) -> list:
     return found
 
 
+def get_file_snippet(project_path: Path, rel_path: str, failures: list) -> str:
+    import re
+    full_path = _resolve_full_path(rel_path, project_path)
+    if not full_path.exists():
+        return ""
+
+    try:
+        content = full_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+
+    lines = content.splitlines()
+    num_lines = len(lines)
+    if not lines:
+        return ""
+
+    # Parse tracebacks to find lines for this specific file
+    line_numbers = set()
+    
+    pattern_file_line = re.compile(r'File\s+"([^"]+\.py)",\s+line\s+(\d+)')
+    pattern_colon_line = re.compile(r'([\w/\\.-]+\.py):(\d+)')
+    
+    target_norm = rel_path.replace("\\", "/").lower()
+    
+    for f in failures:
+        if f.get("file_path") and f.get("file_path").replace("\\", "/").lower() == target_norm:
+            if f.get("line_number"):
+                line_numbers.add(int(f["line_number"]))
+                
+        tb = f.get("traceback", "")
+        for line in tb.splitlines():
+            for fp, lnum in pattern_file_line.findall(line):
+                fp_norm = fp.replace("\\", "/").lower()
+                if fp_norm.endswith(target_norm) or target_norm.endswith(fp_norm):
+                    line_numbers.add(int(lnum))
+            for fp, lnum in pattern_colon_line.findall(line):
+                if any(p in fp for p in (".venv", "site-packages", "Python.framework")):
+                    continue
+                fp_norm = fp.replace("\\", "/").lower()
+                if fp_norm.endswith(target_norm) or target_norm.endswith(fp_norm):
+                    line_numbers.add(int(lnum))
+
+    # If it's a test file and we didn't find specific line numbers, search for test function names
+    if not line_numbers and ("test_" in rel_path or "tests/" in rel_path):
+        for f in failures:
+            tname = f.get("test_name", "")
+            clean_tname = tname.split("::")[-1] if "::" in tname else tname
+            if clean_tname:
+                for idx, line in enumerate(lines):
+                    if f"def {clean_tname}" in line:
+                        line_numbers.add(idx + 1)
+                        line_numbers.add(idx + 10)
+                        line_numbers.add(idx + 20)
+
+    # If we still have no line numbers, return first 150 lines
+    if not line_numbers:
+        if num_lines <= 150:
+            return content
+        else:
+            return "\n".join(lines[:150]) + "\n\n... [TRUNCATED - showing first 150 lines] ..."
+
+    # Build windows/intervals around matching lines
+    intervals = []
+    for lnum in line_numbers:
+        # Context window: 50 lines before and after
+        start = max(1, lnum - 50)
+        end = min(num_lines, lnum + 50)
+        intervals.append((start, end))
+
+    # Merge intervals
+    intervals = sorted(intervals, key=lambda x: x[0])
+    merged = []
+    if intervals:
+        merged.append(intervals[0])
+        for current in intervals[1:]:
+            prev_start, prev_end = merged[-1]
+            curr_start, curr_end = current
+            if curr_start <= prev_end + 10:
+                merged[-1] = (prev_start, max(prev_end, curr_end))
+            else:
+                merged.append(current)
+
+    # Format the snippets
+    snippet_parts = []
+    for idx, (start, end) in enumerate(merged):
+        if idx > 0:
+            snippet_parts.append("\n... [SKIPPED LINES] ...\n")
+        snippet_parts.append("\n".join(lines[start - 1:end]))
+        
+    return "\n".join(snippet_parts)
+
+
 def fetch_files(state: AgentState) -> dict:
     """Collect all source files referenced in failures."""
     failures = state.get("failures", [])
@@ -126,13 +218,12 @@ def fetch_files(state: AgentState) -> dict:
 
     relevant: dict = {}
     for rel_path in list(paths_to_fetch)[:MAX_FILES]:
-        full = _resolve_full_path(rel_path, project_path)
-        if full.exists():
-            content = _read_file(full)
+        content = get_file_snippet(project_path, rel_path, failures)
+        if content:
             relevant[rel_path] = content
-            console.print(f"   📄 {rel_path} ({len(content)} chars)")
+            console.print(f"   📄 {rel_path} ({len(content)} chars snippet)")
         else:
-            log.warning(f"File not found: {rel_path}")
+            log.warning(f"File not found or empty: {rel_path}")
 
     console.print(f"   ✅ Fetched {len(relevant)} file(s)")
     return {"relevant_files": relevant, "status": "self_healing"}

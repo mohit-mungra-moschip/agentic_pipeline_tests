@@ -28,6 +28,7 @@ from common_utils import AIWrapper, LLMConfig
 from common_utils.logger import get_logger
 from RegressionAI.state import AgentState, FileFix, EnvIssue
 from RegressionAI.skills import load_prompt
+from RegressionAI.agents.node_3_fetch_files import get_file_snippet
 
 console = Console()
 log = get_logger("self_healing")
@@ -445,8 +446,8 @@ def self_healing(state: AgentState) -> dict:
         for path, content in relevant_files.items():
             if intended_healing_type == "TEST_HEAL" and not _is_test_file(path):
                 continue
-            # Read fresh from disk to avoid stale data
-            disk_content = _read_file_safe(Path(project_path) / path)
+            # Read fresh from disk to avoid stale data (using snippet logic to stay within token limits)
+            disk_content = get_file_snippet(Path(project_path), path, failures)
             filtered_files[path] = disk_content if disk_content else content
 
         for path, content in list(filtered_files.items())[:15]:
@@ -478,50 +479,49 @@ Relevant source files:
 {failed_attempts_context}
 Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix the source file."""
 
-        try:
-            ai = AIWrapper(LLMConfig(model=model_to_use, temperature=0.1), mode="llm")
-            raw = _call_llm_with_progress(ai.run, prompt, system_prompt=SYSTEM_PROMPT)
-            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
-            log.info(f"Self-healing raw LLM response (Attempt {internal_attempt+1}): {raw}")
+        # Determine candidate models to try for this attempt
+        candidate_models = []
+        if intended_healing_type == "APP_HEAL":
+            advanced_env = os.getenv("ADVANCED_HEALING_MODEL", "anthropic/claude-3-5-sonnet-20241022").strip()
+            candidate_models.append(advanced_env)
+            if advanced_env != "google/gemini-2.5-flash":
+                candidate_models.append("google/gemini-2.5-flash")
+        
+        # Always include the standard model at the end
+        if SELF_HEALING_MODEL not in candidate_models:
+            candidate_models.append(SELF_HEALING_MODEL)
+
+        raw = None
+        fixes_raw = None
+        success_model = None
+
+        for model_candidate in candidate_models:
             try:
-                fixes_raw = json.loads(raw)
-            except Exception:
-                fixes_raw = repair_json(raw, return_objects=True)
-
-            if not isinstance(fixes_raw, list) or not fixes_raw:
-                console.print(f"   ⚠️  No fixes generated on internal attempt {internal_attempt+1}.")
-                internal_failures_history.append(f"Attempt #{internal_attempt+1}: No fixes generated or invalid format.")
-                internal_attempt += 1
-                continue
-        except Exception as exc:
-            if model_to_use != SELF_HEALING_MODEL:
-                console.print(f"   ⚠️  Advanced model {model_to_use} failed: {exc}. Falling back to standard model: {SELF_HEALING_MODEL}")
-                model_to_use = SELF_HEALING_MODEL
-                ai = AIWrapper(LLMConfig(model=model_to_use, temperature=0.1), mode="llm")
+                console.print(f"   🤖 Calling model: {model_candidate}...")
+                ai = AIWrapper(LLMConfig(model=model_candidate, temperature=0.1), mode="llm")
+                raw = _call_llm_with_progress(ai.run, prompt, system_prompt=SYSTEM_PROMPT)
+                raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
+                log.info(f"Self-healing raw LLM response ({model_candidate}): {raw}")
+                
                 try:
-                    raw = _call_llm_with_progress(ai.run, prompt, system_prompt=SYSTEM_PROMPT)
-                    raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
-                    log.info(f"Self-healing raw LLM response (Attempt {internal_attempt+1} fallback): {raw}")
-                    try:
-                        fixes_raw = json.loads(raw)
-                    except Exception:
-                        fixes_raw = repair_json(raw, return_objects=True)
-
-                    if not isinstance(fixes_raw, list) or not fixes_raw:
-                        console.print(f"   ⚠️  No fixes generated on internal attempt {internal_attempt+1} fallback.")
-                        internal_failures_history.append(f"Attempt #{internal_attempt+1}: No fixes generated during fallback.")
-                        internal_attempt += 1
-                        continue
-                except Exception as exc_fallback:
-                    console.print(f"   ❌ LLM fix generation failed on fallback: {exc_fallback}")
-                    internal_failures_history.append(f"Attempt #{internal_attempt+1}: Fallback LLM call failed: {exc_fallback}")
-                    internal_attempt += 1
-                    continue
-            else:
-                console.print(f"   ❌ LLM fix generation failed on internal attempt {internal_attempt+1}: {exc}")
-                internal_failures_history.append(f"Attempt #{internal_attempt+1}: LLM call failed with error: {exc}")
-                internal_attempt += 1
+                    fixes_raw = json.loads(raw)
+                except Exception:
+                    fixes_raw = repair_json(raw, return_objects=True)
+                
+                if isinstance(fixes_raw, list) and fixes_raw:
+                    success_model = model_candidate
+                    break
+                else:
+                    console.print(f"   ⚠️  No fixes generated by {model_candidate}.")
+            except Exception as model_exc:
+                console.print(f"   ⚠️  Model {model_candidate} failed: {model_exc}")
                 continue
+
+        if not success_model or not fixes_raw:
+            console.print(f"   ❌ All candidate models failed to generate a fix on internal attempt {internal_attempt+1}.")
+            internal_failures_history.append(f"Attempt #{internal_attempt+1}: All candidate models failed.")
+            internal_attempt += 1
+            continue
 
         # Keep backups of files we are going to modify
         backups = {}

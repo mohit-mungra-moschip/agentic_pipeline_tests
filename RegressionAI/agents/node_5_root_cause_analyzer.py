@@ -97,25 +97,39 @@ def root_cause_commit_analysis(state: AgentState) -> dict:
             primary_failure = failures[i]
             break
 
-    # Determine the target git directory and file path
-    target_git_dir = project_path
+    # Determine git directories
+    app_git_dir = project_path
+    test_git_dir = os.path.join(project_path, "test_framework")
+    has_test_framework = os.path.exists(test_git_dir) and os.path.exists(os.path.join(test_git_dir, ".git"))
+
     rel_file_path = primary_failure.get("file_path", "")
-    if rel_file_path and rel_file_path.startswith("test_framework/"):
-        target_git_dir = os.path.join(project_path, "test_framework")
-        rel_file_path = rel_file_path[len("test_framework/"):]
 
     # Gather git context
     console.print("   → Collecting git history...")
-    recent_commits = _get_recent_commits(target_git_dir, n=10)
-    changed_files = _get_changed_files_per_commit(target_git_dir, n=5)
+    app_recent_commits = _get_recent_commits(app_git_dir, n=10)
+    app_changed_files = _get_changed_files_per_commit(app_git_dir, n=5)
+
+    test_recent_commits = ""
+    test_changed_files = ""
+    if has_test_framework:
+        test_recent_commits = _get_recent_commits(test_git_dir, n=10)
+        test_changed_files = _get_changed_files_per_commit(test_git_dir, n=5)
 
     blame_output = ""
     if rel_file_path:
-        blame_output = _git_blame_file(
-            target_git_dir,
-            rel_file_path,
-            primary_failure.get("line_number"),
-        )
+        if rel_file_path.startswith("test_framework/"):
+            blame_git_dir = test_git_dir
+            blame_file = rel_file_path[len("test_framework/"):]
+        else:
+            blame_git_dir = app_git_dir
+            blame_file = rel_file_path
+
+        if blame_file:
+            blame_output = _git_blame_file(
+                blame_git_dir,
+                blame_file,
+                primary_failure.get("line_number"),
+            )
 
     # Build prompt
     context = f"""FAILURE DETAILS:
@@ -124,12 +138,22 @@ File: {primary_failure.get('file_path', 'unknown')}
 Error: {primary_failure.get('error_type', '')}: {primary_failure.get('error_message', '')[:300]}
 Traceback: {primary_failure.get('traceback', '')[:1000]}
 
-RECENT GIT COMMITS (last 10):
-{recent_commits or '(no git history available)'}
+RECENT GIT COMMITS (APP REPOSITORY):
+{app_recent_commits or '(no git history available)'}
 
-FILES CHANGED IN RECENT COMMITS:
-{changed_files or '(not available)'}
+FILES CHANGED IN RECENT COMMITS (APP REPOSITORY):
+{app_changed_files or '(not available)'}
+"""
+    if has_test_framework:
+        context += f"""
+RECENT GIT COMMITS (TEST REPOSITORY):
+{test_recent_commits or '(no git history available)'}
 
+FILES CHANGED IN RECENT COMMITS (TEST REPOSITORY):
+{test_changed_files or '(not available)'}
+"""
+
+    context += f"""
 GIT BLAME OUTPUT (failing file):
 {blame_output or '(not available)'}
 """
@@ -145,21 +169,32 @@ GIT BLAME OUTPUT (failing file):
                 raw = raw[4:]
         parsed = json.loads(raw.strip())
         sha = parsed.get("commit_sha", "unknown")
+        author = parsed.get("author", "unknown")
+        author_email = parsed.get("author_email", "")
         date_str = "unknown"
         commit_msg = parsed.get("commit_message", "unknown")
         
         if sha != "unknown" and len(sha) >= 7:
-            git_info = _run_git(["git", "log", "-1", "--pretty=format:%ad|%B", "--date=short", sha], target_git_dir)
+            # Try to search in App repository first
+            git_info = _run_git(["git", "log", "-1", "--pretty=format:%an|%ae|%ad|%B", "--date=short", sha], app_git_dir)
+            
+            # If not found in App repo, try Test repo
+            if (not git_info or "|" not in git_info) and has_test_framework:
+                git_info = _run_git(["git", "log", "-1", "--pretty=format:%an|%ae|%ad|%B", "--date=short", sha], test_git_dir)
+                
             if git_info and "|" in git_info:
-                parts = git_info.split("|", 1)
-                date_str = parts[0].strip()
-                commit_msg = parts[1].strip()
+                parts = git_info.split("|", 3)
+                if len(parts) >= 4:
+                    author = parts[0].strip()
+                    author_email = parts[1].strip()
+                    date_str = parts[2].strip()
+                    commit_msg = parts[3].strip()
 
         result = RootCauseResult(
             commit_sha=sha,
             commit_message=commit_msg,
-            author=parsed.get("author", "unknown"),
-            author_email=parsed.get("author_email", ""),
+            author=author,
+            author_email=author_email,
             date=date_str,
             changed_files=parsed.get("changed_files", []),
             analysis=parsed.get("analysis", ""),
