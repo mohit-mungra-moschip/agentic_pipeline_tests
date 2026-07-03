@@ -5,7 +5,7 @@ import os
 # ------------------------------------------
 
 # Jira Connection Settings
-JIRA_SERVER = os.getenv("JIRA_SERVER", "https://moschip-team-doibg33r.atlassian.net")
+JIRA_SERVER = os.getenv("JIRA_SERVER", "https://krupali-bhadaraka-moschip.atlassian.net")
 JIRA_USERNAME = os.getenv("JIRA_USERNAME", "mohit.mungra@moschip.com")
 JIRA_PASSWORD = os.getenv("JIRA_PASSWORD", "")
 
@@ -13,8 +13,8 @@ JIRA_PASSWORD = os.getenv("JIRA_PASSWORD", "")
 ASSIGNEE_EMAIL = "mohit.mungra@moschip.com"
 ISSUE_TYPE = "Bug"
 JIRA_PROJECT_KEY = "SCRUM"
-JIRA_BOARD_NAME = "SCRUM board"
-JIRA_SPRINT_NAME = "SCRUM Sprint 0"
+JIRA_BOARD_NAME = "My Scrum Space"
+JIRA_SPRINT_NAME = "SCRUM Sprint 1"
 
 # Master toggle for automated Jira bug creation on test failure.
 # Set to False (or env CREATE_JIRA=false/0) to skip Jira ticket creation.
