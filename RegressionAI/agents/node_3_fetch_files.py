@@ -256,8 +256,38 @@ def fetch_files(state: AgentState) -> dict:
                 pass
     paths_to_fetch.update(dependencies)
 
+    # Prioritize paths so we don't drop critical routers/tests during slicing
+    def get_path_priority(path_str: str) -> int:
+        path_lower = path_str.replace("\\", "/").lower()
+        # Direct failing file
+        for f in unique_failures:
+            if f.get("file_path") and f["file_path"].replace("\\", "/").lower() == path_lower:
+                return 100
+        # Traceback files
+        for f in unique_failures:
+            if f.get("traceback") and path_lower in f["traceback"].replace("\\", "/").lower():
+                return 80
+        # Routers/controllers
+        if "router" in path_lower or "controller" in path_lower:
+            return 60
+        # CRUD
+        if "crud" in path_lower:
+            return 50
+        # Schema
+        if "schema" in path_lower:
+            return 30
+        # Model
+        if "model" in path_lower:
+            return 20
+        # Database
+        if "database" in path_lower or "db" in path_lower:
+            return 10
+        return 0
+
+    sorted_paths = sorted(list(paths_to_fetch), key=get_path_priority, reverse=True)
+
     relevant: dict = {}
-    for rel_path in list(paths_to_fetch)[:MAX_FILES]:
+    for rel_path in sorted_paths[:MAX_FILES]:
         content = get_file_snippet(project_path, rel_path, failures)
         if content:
             relevant[rel_path] = content
