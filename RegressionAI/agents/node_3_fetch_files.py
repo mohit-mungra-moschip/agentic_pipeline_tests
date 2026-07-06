@@ -12,8 +12,8 @@ from RegressionAI.state import AgentState
 console = Console()
 log = get_logger("fetch_files")
 
-MAX_FILE_SIZE = 3500  # chars per file
-MAX_FILES = 5
+MAX_FILE_SIZE = 4500  # chars per file
+MAX_FILES = 10
 
 
 def _read_file(path: Path) -> str:
@@ -173,6 +173,23 @@ def get_file_snippet(project_path: Path, rel_path: str, failures: list) -> str:
     return "\n".join(snippet_parts)
 
 
+def _get_failure_key(f: dict) -> tuple:
+    import re
+    file_path = f.get("file_path", "")
+    line_number = f.get("line_number", 0)
+    
+    tb = f.get("traceback", "")
+    if tb:
+        matches = re.findall(r'File\s+"([^"]+\.py)",\s+line\s+(\d+)', tb)
+        if matches:
+            for fp, lnum in reversed(matches):
+                if not any(part in fp for part in (".venv", "site-packages", "Python.framework")):
+                    file_path = fp
+                    line_number = int(lnum)
+                    break
+    return (str(file_path).lower(), int(line_number))
+
+
 def fetch_files(state: AgentState) -> dict:
     """Collect all source files referenced in failures."""
     failures = state.get("failures", [])
@@ -180,9 +197,22 @@ def fetch_files(state: AgentState) -> dict:
 
     console.print(f"\n[bold blue]📁 Fetch Files[/bold blue]")
 
+    # De-duplicate failures based on failure location to keep context size small
+    unique_failures = []
+    seen_keys = set()
+    for f in failures:
+        key = _get_failure_key(f)
+        t_name = f.get("test_name", "unknown")
+        if key not in seen_keys and t_name not in seen_keys:
+            seen_keys.add(key)
+            seen_keys.add(t_name)
+            unique_failures.append(f)
+    if not unique_failures:
+        unique_failures = failures
+
     paths_to_fetch = set()
 
-    for f in failures:
+    for f in unique_failures:
         if f.get("file_path"):
             paths_to_fetch.add(f["file_path"])
             # Resolve associated source files dynamically (e.g., routers)
