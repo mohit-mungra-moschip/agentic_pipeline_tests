@@ -420,13 +420,13 @@ def self_healing(state: AgentState) -> dict:
 
     # Prepare base contexts for failures and files
     failures_context = ""
-    for f in failures[:15]:
+    for f in failures[:3]:
         cls = cls_map.get(f.get("test_name", ""), {})
         failures_context += (
             f"\n--- FAILURE: {f.get('test_name')} ---\n"
             f"Type: {cls.get('bug_type', 'unknown')}\n"
-            f"Error: {f.get('error_type', '')}: {f.get('error_message', '')[:1000]}\n"
-            f"Traceback:\n{f.get('traceback', '')[:4000]}\n"
+            f"Error: {f.get('error_type', '')}: {f.get('error_message', '')[:500]}\n"
+            f"Traceback:\n{f.get('traceback', '')[:1500]}\n"
         )
 
     if intended_healing_type == "APP_HEAL":
@@ -450,7 +450,7 @@ def self_healing(state: AgentState) -> dict:
             disk_content = get_file_snippet(Path(project_path), path, failures)
             filtered_files[path] = disk_content if disk_content else content
 
-        for path, content in list(filtered_files.items())[:15]:
+        for path, content in list(filtered_files.items())[:5]:
             if intended_healing_type == "APP_HEAL" and _is_test_file(path):
                 files_context += f"\n=== [READ-ONLY REFERENCE] {path} ===\n{content}\n"
             else:
@@ -482,6 +482,8 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
         # Determine candidate models to try for this attempt
         candidate_models = []
         fallback_model = os.getenv("FALLBACK_MODEL", "").strip()
+        if not fallback_model and (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
+            fallback_model = "google/gemini-2.5-flash"
 
         if intended_healing_type == "APP_HEAL":
             advanced_env = os.getenv("ADVANCED_HEALING_MODEL", "").strip()

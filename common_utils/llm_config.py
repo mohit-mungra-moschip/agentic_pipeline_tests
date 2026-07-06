@@ -358,7 +358,15 @@ class RotatingLLM:
                     except Exception as inner_exc:
                         errors.append(f"{self._labels[idx]}: loop-bypass failed: {str(inner_exc)[:100]}")
                         continue
-                raise   # non-rotatable errors propagate immediately
+                
+                # Non-rotatable error (like 413 request too large, or other exceptions)
+                if self.fallback_llm:
+                    console.print(
+                        f"[bold yellow]⚠️  Model '{self._model}' failed with non-rotatable error: {exc}. "
+                        f"Falling back to model '{self.fallback_llm._model}'...[/bold yellow]"
+                    )
+                    return self.fallback_llm.invoke(messages, **kwargs)
+                raise
 
         if self.fallback_llm:
             console.print(
@@ -446,6 +454,15 @@ class RotatingLLM:
                     except Exception as inner_exc:
                         errors.append(f"{self._labels[idx]}: loop-bypass stream failed: {str(inner_exc)[:100]}")
                         continue
+                
+                # Non-rotatable error
+                if self.fallback_llm:
+                    console.print(
+                        f"\n[bold yellow]⚠️  Model '{self._model}' failed with non-rotatable error: {exc}. "
+                        f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
+                    )
+                    yield from self.fallback_llm.stream(messages, **kwargs)
+                    return
                 raise
 
         if self.fallback_llm:
@@ -496,6 +513,9 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
 
     fallback_llm = None
     fallback_model = os.getenv("FALLBACK_MODEL", "").strip()
+    if not fallback_model and (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
+        fallback_model = "google/gemini-2.5-flash"
+
     if not is_fallback and fallback_model and fallback_model != model:
         try:
             # We copy kwargs to avoid sharing state between primary and fallback
