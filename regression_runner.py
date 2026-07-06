@@ -13,7 +13,16 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+# Try multiple candidate paths for .env
+env_paths = [
+    os.path.join(os.getcwd(), ".env"),
+    os.path.join(os.path.dirname(__file__), "../agentic_pipeline/.env"),
+    os.path.join(os.path.dirname(__file__), ".env")
+]
+for path in env_paths:
+    if os.path.exists(path):
+        load_dotenv(dotenv_path=path, override=True)
+        break
 
 # Ensure parent directory of workspaces is in sys.path for docstring import resolving
 parent_dir = str(Path(__file__).resolve().parent.parent)

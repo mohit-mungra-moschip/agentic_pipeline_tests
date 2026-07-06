@@ -481,15 +481,21 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
 
         # Determine candidate models to try for this attempt
         candidate_models = []
+        fallback_model = os.getenv("FALLBACK_MODEL", "").strip()
+
         if intended_healing_type == "APP_HEAL":
-            advanced_env = os.getenv("ADVANCED_HEALING_MODEL", "anthropic/claude-3-5-sonnet-20241022").strip()
+            advanced_env = os.getenv("ADVANCED_HEALING_MODEL", "").strip()
+            if not advanced_env:
+                advanced_env = os.getenv("DEFAULT_MODEL", "groq/llama-3.3-70b-versatile").strip()
             candidate_models.append(advanced_env)
-            if advanced_env != "google/gemini-2.5-flash":
-                candidate_models.append("google/gemini-2.5-flash")
-        
-        # Always include the standard model at the end
-        if SELF_HEALING_MODEL not in candidate_models:
-            candidate_models.append(SELF_HEALING_MODEL)
+        else:
+            healing_env = os.getenv("SELF_HEALING_MODEL", "").strip()
+            if not healing_env:
+                healing_env = os.getenv("DEFAULT_MODEL", "groq/llama-3.3-70b-versatile").strip()
+            candidate_models.append(healing_env)
+
+        if fallback_model and fallback_model not in candidate_models:
+            candidate_models.append(fallback_model)
 
         raw = None
         fixes_raw = None

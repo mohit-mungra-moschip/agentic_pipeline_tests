@@ -276,11 +276,12 @@ class RotatingLLM:
     restarts the full stream from the beginning).
     """
 
-    def __init__(self, llms: list, labels: List[str], model: str, shared_idx: list = None) -> None:
+    def __init__(self, llms: list, labels: List[str], model: str, shared_idx: list = None, fallback_llm = None) -> None:
         self._llms   = llms
         self._labels = labels        # e.g. ["key 1/3", "key 2/3", "key 3/3"]
         self._model  = model
         self._shared_idx = shared_idx if shared_idx is not None else [0]
+        self.fallback_llm = fallback_llm
 
     @property
     def _idx(self):
@@ -292,11 +293,13 @@ class RotatingLLM:
 
     def bind_tools(self, tools, **kwargs):
         bound_llms = [llm.bind_tools(tools, **kwargs) for llm in self._llms]
-        return RotatingLLM(bound_llms, self._labels, self._model, self._shared_idx)
+        bound_fallback = self.fallback_llm.bind_tools(tools, **kwargs) if self.fallback_llm else None
+        return RotatingLLM(bound_llms, self._labels, self._model, self._shared_idx, bound_fallback)
 
     def bind(self, **kwargs):
         bound_llms = [llm.bind(**kwargs) for llm in self._llms]
-        return RotatingLLM(bound_llms, self._labels, self._model, self._shared_idx)
+        bound_fallback = self.fallback_llm.bind(**kwargs) if self.fallback_llm else None
+        return RotatingLLM(bound_llms, self._labels, self._model, self._shared_idx, bound_fallback)
 
     # ------------------------------------------------------------------
     def invoke(self, messages, **kwargs):
@@ -356,6 +359,13 @@ class RotatingLLM:
                         errors.append(f"{self._labels[idx]}: loop-bypass failed: {str(inner_exc)[:100]}")
                         continue
                 raise   # non-rotatable errors propagate immediately
+
+        if self.fallback_llm:
+            console.print(
+                f"[bold yellow]⚠️  All keys for '{self._model}' failed. "
+                f"Falling back to model '{self.fallback_llm._model}'...[/bold yellow]"
+            )
+            return self.fallback_llm.invoke(messages, **kwargs)
 
         raise RuntimeError(self._exhausted_msg(errors))
 
@@ -438,6 +448,14 @@ class RotatingLLM:
                         continue
                 raise
 
+        if self.fallback_llm:
+            console.print(
+                f"\n[bold yellow]⚠️  All keys for '{self._model}' failed. "
+                f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
+            )
+            yield from self.fallback_llm.stream(messages, **kwargs)
+            return
+
         raise RuntimeError(self._exhausted_msg(errors))
 
     # ------------------------------------------------------------------
@@ -474,6 +492,18 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
     Reads the API key env var for the detected provider.
     Multiple comma-separated keys are all loaded and rotated on rate-limit.
     """
+    is_fallback = kwargs.pop("is_fallback", False)
+
+    fallback_llm = None
+    fallback_model = os.getenv("FALLBACK_MODEL", "").strip()
+    if not is_fallback and fallback_model and fallback_model != model:
+        try:
+            # We copy kwargs to avoid sharing state between primary and fallback
+            fallback_kwargs = dict(kwargs)
+            fallback_llm = get_llm(fallback_model, temperature=temperature, is_fallback=True, **fallback_kwargs)
+        except Exception as fallback_exc:
+            console.print(f"[dim yellow]⚠️  Failed to load fallback model '{fallback_model}': {fallback_exc}[/dim yellow]")
+
     provider   = _detect_provider(model)
     bare_model = _strip_provider_prefix(model)   # strip 'groq/', 'ollama/', etc.
 
@@ -487,7 +517,7 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
         console.print(f"[dim]🖥  Ollama  [{bare_model}]  {base_url}[/dim]")
         llm = _make_single_llm("ollama", bare_model, "", temperature,
                                base_url=base_url, **kwargs)
-        return RotatingLLM([llm], ["local"], bare_model)
+        return RotatingLLM([llm], ["local"], bare_model, fallback_llm=fallback_llm)
 
     # ── Cloud providers: load API key(s) ──────────────────────────────────────
     key_env_map = {
@@ -531,7 +561,7 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
         _GLOBAL_KEY_INDICES[key_env] = [0]
     shared_idx = _GLOBAL_KEY_INDICES[key_env]
 
-    return RotatingLLM(llms, labels, bare_model, shared_idx)
+    return RotatingLLM(llms, labels, bare_model, shared_idx, fallback_llm)
 
 
 
