@@ -12,8 +12,8 @@ from RegressionAI.state import AgentState
 console = Console()
 log = get_logger("fetch_files")
 
-MAX_FILE_SIZE = 8000  # chars per file
-MAX_FILES = 15
+MAX_FILE_SIZE = 3500  # chars per file
+MAX_FILES = 5
 
 
 def _read_file(path: Path) -> str:
@@ -135,19 +135,19 @@ def get_file_snippet(project_path: Path, rel_path: str, failures: list) -> str:
                         line_numbers.add(idx + 10)
                         line_numbers.add(idx + 20)
 
-    # If we still have no line numbers, return first 150 lines
+    # If we still have no line numbers, return first 50 lines
     if not line_numbers:
-        if num_lines <= 150:
+        if num_lines <= 50:
             return content
         else:
-            return "\n".join(lines[:150]) + "\n\n... [TRUNCATED - showing first 150 lines] ..."
+            return "\n".join(lines[:50]) + "\n\n... [TRUNCATED - showing first 50 lines] ..."
 
     # Build windows/intervals around matching lines
     intervals = []
     for lnum in line_numbers:
-        # Context window: 50 lines before and after
-        start = max(1, lnum - 50)
-        end = min(num_lines, lnum + 50)
+        # Context window: 20 lines before and after
+        start = max(1, lnum - 20)
+        end = min(num_lines, lnum + 20)
         intervals.append((start, end))
 
     # Merge intervals

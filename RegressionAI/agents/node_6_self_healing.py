@@ -511,7 +511,7 @@ def self_healing(state: AgentState) -> dict:
         
         sorted_files.sort(key=lambda x: x[0], reverse=True)
 
-        for _, path, content in sorted_files[:15]:
+        for _, path, content in sorted_files[:5]:
             if intended_healing_type == "APP_HEAL" and _is_test_file(path):
                 files_context += f"\n=== [READ-ONLY REFERENCE] {path} ===\n{content}\n"
             else:
