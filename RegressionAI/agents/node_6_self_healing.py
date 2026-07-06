@@ -450,7 +450,27 @@ def self_healing(state: AgentState) -> dict:
             disk_content = get_file_snippet(Path(project_path), path, failures)
             filtered_files[path] = disk_content if disk_content else content
 
-        for path, content in list(filtered_files.items())[:5]:
+        # Prioritize files needed by the failures we are displaying
+        needed_normalized = set()
+        import re
+        for f in failures[:3]:
+            if f.get("file_path"):
+                needed_normalized.add(Path(f["file_path"]).as_posix().lower())
+            tb = f.get("traceback", "")
+            for m in re.findall(r"([\w/\\.-]+\.py)", tb):
+                if not any(part in m for part in (".venv", "site-packages", "Python.framework")):
+                    needed_normalized.add(Path(m).as_posix().lower())
+
+        # Sort filtered_files: prioritized first, then others
+        sorted_files = []
+        for path, content in filtered_files.items():
+            path_lower = Path(path).as_posix().lower()
+            is_priority = any(needed in path_lower or path_lower in needed for needed in needed_normalized)
+            sorted_files.append((is_priority, path, content))
+        
+        sorted_files.sort(key=lambda x: x[0], reverse=True)
+
+        for _, path, content in sorted_files[:6]:
             if intended_healing_type == "APP_HEAL" and _is_test_file(path):
                 files_context += f"\n=== [READ-ONLY REFERENCE] {path} ===\n{content}\n"
             else:
