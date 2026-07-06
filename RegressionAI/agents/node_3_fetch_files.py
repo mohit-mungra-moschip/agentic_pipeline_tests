@@ -175,8 +175,15 @@ def get_file_snippet(project_path: Path, rel_path: str, failures: list) -> str:
 
 def _get_failure_key(f: dict) -> tuple:
     import re
-    file_path = f.get("file_path", "")
-    line_number = f.get("line_number", 0)
+    file_path = f.get("file_path") or ""
+    
+    line_number = 0
+    raw_lnum = f.get("line_number")
+    if raw_lnum is not None:
+        try:
+            line_number = int(raw_lnum)
+        except (ValueError, TypeError):
+            line_number = 0
     
     tb = f.get("traceback", "")
     if tb:
@@ -184,10 +191,13 @@ def _get_failure_key(f: dict) -> tuple:
         if matches:
             for fp, lnum in reversed(matches):
                 if not any(part in fp for part in (".venv", "site-packages", "Python.framework")):
-                    file_path = fp
-                    line_number = int(lnum)
+                    file_path = fp or ""
+                    try:
+                        line_number = int(lnum)
+                    except (ValueError, TypeError):
+                        line_number = 0
                     break
-    return (str(file_path).lower(), int(line_number))
+    return (str(file_path).lower(), line_number)
 
 
 def fetch_files(state: AgentState) -> dict:
