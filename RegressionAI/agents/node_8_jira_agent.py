@@ -46,18 +46,30 @@ def _get_jira_client():
 
 def _add_to_sprint(jira, issue_key: str):
     """Attempt to add an issue to the active sprint (best-effort)."""
-    board_name  = os.getenv("JIRA_BOARD_NAME",  "SCRUM board")
-    sprint_name = os.getenv("JIRA_SPRINT_NAME", "SCRUM Sprint 0")
+    try:
+        import config
+        default_board = config.JIRA_BOARD_NAME
+        default_sprint = config.JIRA_SPRINT_NAME
+    except ImportError:
+        default_board = "SCRUM board"
+        default_sprint = "SCRUM Sprint 0"
+
+    board_name  = os.getenv("JIRA_BOARD_NAME",  default_board).strip().strip("'\"")
+    sprint_name = os.getenv("JIRA_SPRINT_NAME", default_sprint).strip().strip("'\"")
     try:
         boards = jira.boards(name=board_name)
         if boards:
             sprints = jira.sprints(boards[0].id)
             active  = next((s for s in sprints if s.state == "active" and s.name == sprint_name), None)
+            if not active:
+                # Robust fallback: find any active sprint on this board
+                active = next((s for s in sprints if s.state == "active"), None)
+            
             if active:
                 jira.add_issues_to_sprint(active.id, [issue_key])
-                console.print(f"   Sprint: Added to '{sprint_name}'")
+                console.print(f"   Sprint: Added to '{active.name}'")
             else:
-                log.warning(f"No active sprint named '{sprint_name}'")
+                log.warning(f"No active sprint found on board '{board_name}' (configured name: '{sprint_name}')")
     except Exception as exc:
         log.warning(f"Failed to add {issue_key} to sprint: {exc}")
 
@@ -69,8 +81,15 @@ def _assign_issue(jira, issue_key: str, assignee_email: str):
         try:
             jira.assign_issue(issue_key, target)
             console.print(f"   Assignee: {target}")
+            return
         except Exception as exc:
             log.warning(f"Failed to assign {issue_key} to {target}: {exc}")
+            if target != ASSIGNEE_EMAIL and ASSIGNEE_EMAIL:
+                try:
+                    console.print(f"   Fallback assignee: {ASSIGNEE_EMAIL}")
+                    jira.assign_issue(issue_key, ASSIGNEE_EMAIL)
+                except Exception as exc2:
+                    log.warning(f"Failed fallback assignment to {ASSIGNEE_EMAIL}: {exc2}")
 
 
 def _format_applied_fixes(approved_fixes: list) -> str:
