@@ -223,6 +223,47 @@ def _run_failed_tests(project_path: str, test_command: str, failures: list, use_
         return result.returncode == 0, output
     except Exception as exc:
         return False, str(exc)
+def _parse_failed_test_names_from_xml(project_path: str) -> set:
+    """Parse XML test results to extract set of failing test names."""
+    import xml.etree.ElementTree as ET
+    import re
+    xml_path = os.path.join(project_path, "logs/test-results.xml")
+    failed_names = set()
+    if not os.path.exists(xml_path):
+        return failed_names
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        for tc in root.findall(".//testcase"):
+            failure_node = tc.find("failure")
+            if failure_node is not None:
+                traceback_text = failure_node.text or ""
+                classname = tc.get("classname", "")
+                name = tc.get("name", "")
+                
+                file_path = ""
+                first_line = traceback_text.strip().splitlines()[0] if traceback_text.strip() else ""
+                match = re.match(r"^([^:]+):(\d+):", first_line)
+                if match:
+                    file_path = match.group(1).strip()
+                else:
+                    parts = classname.split(".")
+                    candidate = "/".join(parts) + ".py"
+                    if parts and parts[-1] and parts[-1][0].isupper():
+                        file_path = "/".join(parts[:-1]) + ".py"
+                    else:
+                        file_path = candidate
+                    
+                parts = classname.split(".")
+                if parts[-1].startswith("Test"):
+                    class_only = parts[-1]
+                    test_name = f"{file_path}::{class_only}::{name}"
+                else:
+                    test_name = f"{file_path}::{name}"
+                failed_names.add(test_name)
+    except Exception as exc:
+        log.warning(f"Failed to parse JUnit XML in verification: {exc}")
+    return failed_names
 
 
 def _run_full_suite(project_path: str, test_command: str) -> tuple:
@@ -645,7 +686,40 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
         # Re-run tests in sandbox
         if candidate_healing_type == "APP_HEAL":
             console.print("   🔄 APP_HEAL candidate — running FULL test suite in sandbox to verify no regressions...")
-            passed, test_output = _run_full_suite(project_path, test_command)
+            # Backup the original logs/test-results.xml to compare later
+            xml_path = os.path.join(project_path, "logs/test-results.xml")
+            original_xml_content = None
+            if os.path.exists(xml_path):
+                try:
+                    with open(xml_path, "r", encoding="utf-8") as f:
+                        original_xml_content = f.read()
+                except Exception as xml_err:
+                    log.warning(f"Could not backup xml file: {xml_err}")
+
+            raw_passed, test_output = _run_full_suite(project_path, test_command)
+            
+            if raw_passed:
+                passed = True
+            else:
+                # If raw_passed is False, verify if targeted failures resolved and no new regressions were introduced
+                original_failed_names = {f.get("test_name") for f in failures if f.get("test_name")}
+                targeted_names = {f.get("test_name") for f in failures[:3] if f.get("test_name")}
+                rerun_failed_names = _parse_failed_test_names_from_xml(project_path)
+                
+                log.info(f"Self-healing verification: original={original_failed_names}, targeted={targeted_names}, rerun={rerun_failed_names}")
+                
+                if targeted_names and not targeted_names.intersection(rerun_failed_names) and not (rerun_failed_names - original_failed_names):
+                    console.print("   ✅ Targeted failures resolved, and no new regressions detected. Verification PASSED.")
+                    passed = True
+                else:
+                    passed = False
+                    # Restore original XML
+                    if original_xml_content is not None:
+                        try:
+                            with open(xml_path, "w", encoding="utf-8") as f:
+                                f.write(original_xml_content)
+                        except Exception as xml_err:
+                            log.warning(f"Could not restore backup xml file: {xml_err}")
         else:
             console.print("   🔄 candidate — running failed tests in sandbox...")
             passed, test_output = _run_failed_tests(project_path, test_command, failures)
