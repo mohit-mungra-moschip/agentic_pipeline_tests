@@ -201,7 +201,7 @@ def _make_single_llm(provider: str, model: str, api_key: str,
     'model' must already have its provider prefix stripped (done by get_llm).
     """
     if provider in ("openai", "anthropic", "google", "groq", "openrouter"):
-        kwargs.setdefault("timeout", 30.0)
+        kwargs.setdefault("timeout", 120.0)
 
     if provider == "openai":
         try:
