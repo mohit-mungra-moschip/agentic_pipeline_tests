@@ -224,6 +224,7 @@ def _make_single_llm(provider: str, model: str, api_key: str,
             from langchain_google_genai import ChatGoogleGenerativeAI
         except ImportError:
             raise ImportError("Run: pip install langchain-google-genai")
+        kwargs.setdefault("max_retries", 1)
         return ChatGoogleGenerativeAI(model=model, temperature=temperature,
                                       google_api_key=api_key, **kwargs)
 
