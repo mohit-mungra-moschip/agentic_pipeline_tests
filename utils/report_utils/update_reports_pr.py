@@ -353,10 +353,92 @@ def update_excel_report(pr_url, run_id=None):
                 updated_count += 1
 
         if updated_count > 0:
-            wb.save(str(excel_path))
-            print(f"[+] Excel report updated successfully. Patched {updated_count} rows.")
+            print(f"[+] Test Details sheet: patched {updated_count} rows.")
         else:
-            print(f"[-] No healed rows found in Excel sheet to update.")
+            print(f"[-] No healed rows found in Test Details sheet to update.")
+
+        # ── Also patch the Healed Tests sheet (same PR URL logic) ──────────
+        healed_count_h = 0
+        if "Healed Tests" in wb.sheetnames:
+            ws_h = wb["Healed Tests"]
+            h_headers = [ws_h.cell(row=1, column=col).value for col in range(1, ws_h.max_column + 1)]
+            h_pr_idx = (h_headers.index("PR Link") + 1) if "PR Link" in h_headers else None
+            h_jira_idx = (h_headers.index("Jira Link") + 1) if "Jira Link" in h_headers else None
+            h_tcid_idx = (h_headers.index("Test Case ID") + 1) if "Test Case ID" in h_headers else None
+            h_name_idx = (h_headers.index("Test Case Name") + 1) if "Test Case Name" in h_headers else None
+
+            if h_pr_idx:
+                for r in range(2, ws_h.max_row + 1):
+                    pr_cell_h = ws_h.cell(row=r, column=h_pr_idx)
+                    tc_id_h = ws_h.cell(row=r, column=h_tcid_idx).value if h_tcid_idx else None
+                    tc_name_h = ws_h.cell(row=r, column=h_name_idx).value if h_name_idx else None
+
+                    # Populate Jira Link if missing
+                    res_h = json_map.get(tc_id_h) or json_map.get(tc_name_h)
+                    if h_jira_idx and res_h:
+                        jira_cell_h = ws_h.cell(row=r, column=h_jira_idx)
+                        jira_val_h = jira_cell_h.value
+                        if not jira_val_h or str(jira_val_h).strip() in ("", "N/A", "None"):
+                            jira_id_h = res_h.get("jira_id", "")
+                            jira_url_h = res_h.get("jira_url", "")
+                            if jira_id_h and jira_url_h:
+                                jira_cell_h.value = f'=HYPERLINK("{jira_url_h}","{jira_id_h}")'
+                                jira_cell_h.font = Font(color="0563C1", underline="single", bold=True)
+                            elif jira_id_h:
+                                jira_cell_h.value = jira_id_h
+                                jira_cell_h.font = Font(color="0563C1", bold=True)
+
+                    # Collect and write real PR URLs
+                    existing_val = pr_cell_h.value
+                    urls_h = []
+                    if pr_url:
+                        urls_h.append(pr_url)
+                    for u in extract_urls_from_cell(existing_val):
+                        if u not in urls_h:
+                            urls_h.append(u)
+                    if res_h and res_h.get("pr_url"):
+                        for u in str(res_h.get("pr_url")).split(","):
+                            u_clean = u.strip()
+                            if u_clean and u_clean.startswith("http") and u_clean not in urls_h:
+                                urls_h.append(u_clean)
+
+                    # Keep only real /pull/ URLs
+                    urls_h = [u for u in urls_h if "/tree/" not in u and "/pull/" in u]
+                    if not urls_h and pr_url and "/pull/" in pr_url:
+                        urls_h = [pr_url]
+
+                    if not urls_h:
+                        continue  # nothing to write
+
+                    if len(urls_h) == 1:
+                        su = urls_h[0]
+                        pr_num_h = su.rstrip('/').split('/')[-1]
+                        repo_lbl = "App" if "agentic_pipeline_tests" not in su else "Tests"
+                        pr_txt = f"PR #{pr_num_h} ({repo_lbl})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({repo_lbl})"
+                        pr_cell_h.value = f'=HYPERLINK("{su}","{pr_txt}")'
+                        pr_cell_h.font = Font(color="7C3AED", underline="single", bold=True)
+                    else:
+                        lines_h = []
+                        for u in urls_h:
+                            pr_num_h = u.rstrip('/').split('/')[-1]
+                            repo_lbl = "App" if "agentic_pipeline_tests" not in u else "Tests"
+                            pr_txt = f"PR #{pr_num_h} ({repo_lbl})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({repo_lbl})"
+                            lines_h.append(f"{pr_txt}: {u}")
+                        pr_cell_h.value = "\n".join(lines_h)
+                        pr_cell_h.font = Font(color="7C3AED", underline="single", bold=True)
+                        pr_cell_h.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
+
+                    healed_count_h += 1
+
+            print(f"[+] Healed Tests sheet: patched {healed_count_h} rows.")
+        else:
+            print("[!] 'Healed Tests' sheet not found — skipping.")
+
+        if updated_count > 0 or healed_count_h > 0:
+            wb.save(str(excel_path))
+            print(f"[+] Excel report saved. ({updated_count} Test Details + {healed_count_h} Healed Tests rows updated)")
+        else:
+            print(f"[-] No rows updated in Excel report.")
 
     except Exception as e:
         print(f"[x] Error updating Excel report: {e}")

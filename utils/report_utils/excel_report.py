@@ -1100,12 +1100,10 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                         break
             if is_healed:
                 if ai_state.get("pr_links"):
-                    pr_link = ",".join(str(u) for u in ai_state.get("pr_links") if u)
-                elif ai_state.get("run_id"):
-                    run_id = ai_state.get("run_id")
-                    h_type = ai_state.get("healing_type", "APP_HEAL")
-                    repo = "agentic_pipeline_tests" if h_type == "TEST_HEAL" else "agentic_pipeline"
-                    pr_link = f"https://github.com/mohit-mungra-moschip/{repo}/tree/ai-fix/app-{run_id}"
+                    # Only store real /pull/ URLs — filter out any /tree/ placeholders
+                    real_prs = [str(u) for u in ai_state.get("pr_links") if u and "/pull/" in str(u)]
+                    pr_link = ",".join(real_prs) if real_prs else ""
+                # No fallback /tree/ URL — update_reports_pr.py will fill the real URL after PR creation
 
             results.append({
                 **module_info,
