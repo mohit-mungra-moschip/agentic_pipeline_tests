@@ -973,6 +973,7 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                     if ai_state:
                         # Extract mapping lists
                         jira_map = {j["test_name"]: j for j in ai_state.get("jira_results", [])}
+                        jira_healed_map_fail = {j["test_name"]: j for j in ai_state.get("jira_results_healed", [])}
                         class_map = {c["test_name"]: c for c in ai_state.get("failure_classifications", [])}
                         rec_map = {r["test_name"]: r for r in ai_state.get("action_recommendations", [])}
 
@@ -1004,6 +1005,11 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                                 if match_test_name(classname, raw_name, state_test_name):
                                     matched_test_name = state_test_name
                                     break
+                        if not matched_test_name:
+                            for state_test_name in jira_healed_map_fail.keys():
+                                if match_test_name(classname, raw_name, state_test_name):
+                                    matched_test_name = state_test_name
+                                    break
 
                         if matched_test_name:
                             if matched_test_name in class_map:
@@ -1015,6 +1021,11 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                             if matched_test_name in jira_map:
                                 jira_id = jira_map[matched_test_name].get("jira_id", "")
                                 jira_link = jira_map[matched_test_name].get("jira_url", "")
+                            # For healed tests that still have FAILED status in XML,
+                            # fall back to jira_results_healed for Jira link
+                            if (not jira_id) and matched_test_name in jira_healed_map_fail:
+                                jira_id = jira_healed_map_fail[matched_test_name].get("jira_id", "")
+                                jira_link = jira_healed_map_fail[matched_test_name].get("jira_url", "")
 
                     if not suggested_fix and not short_summary and os.path.exists(ai_summary_file):
                         with open(ai_summary_file, "r", encoding="utf-8") as f:
@@ -1089,7 +1100,7 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                         break
             if is_healed:
                 if ai_state.get("pr_links"):
-                    pr_link = ai_state.get("pr_links")[0]
+                    pr_link = ",".join(str(u) for u in ai_state.get("pr_links") if u)
                 elif ai_state.get("run_id"):
                     run_id = ai_state.get("run_id")
                     h_type = ai_state.get("healing_type", "APP_HEAL")
@@ -1583,7 +1594,7 @@ def _create_excel_report(test_results, output_file):
     is_healed_series = df["IsHealed"] if "IsHealed" in df.columns else pd.Series([False]*len(df))
     healed_count = len(df[is_healed_series == True])
     passed = len(df[(df["Status"] == "PASSED") & (is_healed_series != True)])
-    failed = len(df[df["Status"].isin(["FAILED", "ERROR"])])
+    failed = len(df[(df["Status"].isin(["FAILED", "ERROR"])) & (is_healed_series != True)])
     skipped = len(df[df["Status"] == "SKIPPED"])
     pass_rate = ((passed + healed_count) / total * 100) if total else 0
 
@@ -1630,7 +1641,7 @@ def _create_excel_report(test_results, output_file):
     current_row += 2
 
     fail_modules = (
-        df[df["Status"].isin(["FAILED", "ERROR"])]
+        df[(df["Status"].isin(["FAILED", "ERROR"])) & (is_healed_series != True)]
         .groupby("Feature")
         .size()
         .reset_index(name="Failures")
@@ -1694,9 +1705,7 @@ def _create_excel_report(test_results, output_file):
 
             failed = len(
                 fdf[
-                    fdf["Status"].isin(
-                        ["FAILED", "ERROR"]
-                    )
+                    (fdf["Status"].isin(["FAILED", "ERROR"])) & (is_healed_fdf != True)
                 ]
             )
 
@@ -1854,18 +1863,29 @@ def _create_excel_report(test_results, output_file):
             if val and str(val).startswith("=HYPERLINK"):
                 cell.font = Font(color="0563C1", underline="single", bold=True)
 
-        # PR Link — single-click HYPERLINK formula
+        # PR Link — handle single or comma-separated multi-PR URLs
         if pr_link_idx:
             cell = ws_details.cell(row=r, column=pr_link_idx)
-            url = cell.value
-            if url and str(url).startswith("http"):
-                safe_url = str(url).replace('"', '')
-                pr_num = ""
-                if "/pull/" in safe_url:
+            url_raw = cell.value
+            if url_raw and str(url_raw).strip():
+                urls = [u.strip() for u in str(url_raw).split(",") if u.strip().startswith("http")]
+                if len(urls) == 1:
+                    safe_url = urls[0].replace('"', '')
                     pr_num = safe_url.rstrip('/').split('/')[-1]
-                pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR Link"
-                cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
-                cell.font = Font(color="7C3AED", underline="single", bold=True)
+                    repo_label = "App" if "agentic_pipeline_tests" not in safe_url else "Tests"
+                    pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
+                    cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
+                    cell.font = Font(color="7C3AED", underline="single", bold=True)
+                elif len(urls) > 1:
+                    lines = []
+                    for u in urls:
+                        pr_num = u.rstrip('/').split('/')[-1]
+                        repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
+                        pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
+                        lines.append(f"{pr_text}: {u}")
+                    cell.value = "\n".join(lines)
+                    cell.font = Font(color="7C3AED", underline="single", bold=True)
+                    cell.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
 
     ws_details.freeze_panes = "D2"
     ws_details.auto_filter.ref = ws_details.dimensions
@@ -1875,7 +1895,9 @@ def _create_excel_report(test_results, output_file):
     _align_dashboard_row(ws_dash, current_row)
 
     ws_failed = wb.create_sheet("Failed Tests")
-    fdf = df[df["Status"].isin(["FAILED", "ERROR"])]
+    # Exclude healed tests — only show genuine (non-healed) failures
+    _is_healed_col = df["IsHealed"] if "IsHealed" in df.columns else pd.Series([False]*len(df))
+    fdf = df[(df["Status"].isin(["FAILED", "ERROR"])) & (_is_healed_col != True)]
 
     if fdf.empty:
         ws_failed.append(["No failed tests"])

@@ -405,6 +405,22 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
 
                 payload["results"] = updated_results
 
+                # Recalculate summary counts with healed metrics
+                _results = updated_results
+                _total = len(_results)
+                _healed = sum(1 for r in _results if r.get("pr_url"))
+                _passed = sum(1 for r in _results if r.get("status") in ("PASS", "PASSED") and not r.get("pr_url"))
+                _failed = sum(1 for r in _results if r.get("status") in ("FAIL", "FAILED", "ERROR") and not r.get("pr_url"))
+                _skipped = sum(1 for r in _results if r.get("status") == "SKIPPED")
+                payload["summary"] = {
+                    "total": _total,
+                    "passed": _passed,
+                    "failed": _failed,
+                    "healed": _healed,
+                    "skipped": _skipped,
+                    "success_rate": round(((_passed + _healed) / _total * 100) if _total > 0 else 0.0, 2)
+                }
+
                 # Save updated JSON
                 json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
