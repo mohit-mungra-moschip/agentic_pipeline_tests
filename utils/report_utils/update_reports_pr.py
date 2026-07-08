@@ -103,7 +103,7 @@ def update_json_and_html(run_id, pr_url):
         for result in payload.get("results", []):
             curr_pr = result.get("pr_url", "")
             status = result.get("status", "")
-            is_healed = (status in ("PASS", "PASSED") and result.get("jira_id")) or "ai-fix" in str(curr_pr) or "/pull/" in str(curr_pr)
+            is_healed = result.get("is_healed") or (status in ("PASS", "PASSED") and result.get("jira_id")) or "ai-fix" in str(curr_pr) or "/pull/" in str(curr_pr)
             if is_healed:
                 existing_pr = result.get("pr_url", "")
                 if existing_pr:
@@ -250,12 +250,17 @@ def update_excel_report(pr_url, run_id=None):
         if "Jira Link" in headers:
             jira_id_idx = headers.index("Jira Link") + 1
 
-        pr_link_idx = None
-        if "PR Link" in headers:
-            pr_link_idx = headers.index("PR Link") + 1
-        else:
-            print("[!] 'PR Link' column not found in Excel sheet.")
-            return False
+        ishealed_idx = None
+        if "IsHealed" in headers:
+            ishealed_idx = headers.index("IsHealed") + 1
+
+        pr_app_idx = None
+        if "PR Link (App)" in headers:
+            pr_app_idx = headers.index("PR Link (App)") + 1
+
+        pr_tests_idx = None
+        if "PR Link (Tests)" in headers:
+            pr_tests_idx = headers.index("PR Link (Tests)") + 1
 
         tcid_idx = None
         if "Test Case ID" in headers:
@@ -265,14 +270,12 @@ def update_excel_report(pr_url, run_id=None):
         if "Test Case Name" in headers:
             name_idx = headers.index("Test Case Name") + 1
 
-        print(f"[*] 'Status' col: {status_idx}, 'Jira Link' col: {jira_id_idx}, 'PR Link' col: {pr_link_idx}")
+        print(f"[*] 'Status' col: {status_idx}, 'Jira Link' col: {jira_id_idx}, 'PR Link (App)' col: {pr_app_idx}, 'PR Link (Tests)' col: {pr_tests_idx}")
 
         updated_count = 0
         for r in range(2, ws.max_row + 1):
             status = ws.cell(row=r, column=status_idx).value
-            pr_cell = ws.cell(row=r, column=pr_link_idx)
-            pr_val = pr_cell.value
-
+            
             tc_id = ws.cell(row=r, column=tcid_idx).value if tcid_idx else None
             tc_name = ws.cell(row=r, column=name_idx).value if name_idx else None
 
@@ -305,53 +308,63 @@ def update_excel_report(pr_url, run_id=None):
                 if jira_val and str(jira_val).strip() not in ("", "N/A", "None"):
                     has_jira = True
 
-            is_healed = (status == "PASSED" and has_jira) or (pr_val and "ai-fix" in str(pr_val)) or (res and res.get("pr_url"))
+            # Determine if this row is healed
+            is_healed = False
+            if ishealed_idx:
+                is_h_val = ws.cell(row=r, column=ishealed_idx).value
+                if is_h_val in (True, 1, "TRUE", "1", "True"):
+                    is_healed = True
+            
+            if not is_healed:
+                is_healed = (status == "PASSED" and has_jira) or (res and res.get("is_healed"))
+
             if is_healed:
-                urls = []
-                if pr_url:
-                    urls.append(pr_url)
-                for u in extract_urls_from_cell(pr_val):
-                    if u not in urls:
-                        urls.append(u)
+                # Update the new incoming PR URL to the appropriate column
+                is_test_pr = "agentic_pipeline_tests" in pr_url
+                target_col_idx = pr_tests_idx if is_test_pr else pr_app_idx
+                if target_col_idx:
+                    pr_cell = ws.cell(row=r, column=target_col_idx)
+                    pr_cell.value = pr_url
+
+                # Also populate other column if we have a mapped pr_url in JSON
                 if res and res.get("pr_url"):
                     for u in str(res.get("pr_url")).split(","):
                         u_clean = u.strip()
-                        if u_clean and u_clean.startswith("http") and u_clean not in urls:
-                            urls.append(u_clean)
+                        if u_clean and u_clean.startswith("http") and "/pull/" in u_clean:
+                            u_is_test = "agentic_pipeline_tests" in u_clean
+                            other_col_idx = pr_tests_idx if u_is_test else pr_app_idx
+                            if other_col_idx:
+                                other_cell = ws.cell(row=r, column=other_col_idx)
+                                if not other_cell.value or str(other_cell.value).strip() in ("", "None", "N/A"):
+                                    other_cell.value = u_clean
 
-                # Filter out tree/placeholder links
-                urls = [u for u in urls if "/tree/" not in u and "/pull/" in u]
-                if not urls and pr_url:
-                    urls = [pr_url]
+                # Now style both columns if they have pull requests!
+                row_updated = False
+                for col_idx, is_test_col in [(pr_app_idx, False), (pr_tests_idx, True)]:
+                    if col_idx:
+                        cell = ws.cell(row=r, column=col_idx)
+                        val = cell.value
+                        if val and str(val).strip() and not str(val).startswith("="):
+                            safe_url = str(val).replace('"', '').strip()
+                            if "/pull/" in safe_url:
+                                pr_num = safe_url.rstrip('/').split('/')[-1]
+                                label = "Tests" if is_test_col else "App"
+                                pr_text = f"PR #{pr_num} ({label})" if (pr_num and pr_num.isdigit()) else f"PR ({label})"
+                                cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
+                                cell.font = Font(color="7C3AED", underline="single", bold=True)
+                                row_updated = True
 
-                if len(urls) == 1:
-                    single_url = urls[0]
-                    pr_num = single_url.rstrip('/').split('/')[-1]
-                    repo_label = "App" if "agentic_pipeline_tests" not in single_url else "Tests"
-                    pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                    pr_cell.value = f'=HYPERLINK("{single_url}","{pr_text}")'
-                    pr_cell.font = Font(color="7C3AED", underline="single", bold=True)
-                elif len(urls) > 1:
-                    labels = []
-                    for u in urls:
-                        pr_num = u.rstrip('/').split('/')[-1]
-                        repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                        lbl = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                        labels.append(lbl)
-                    display = " · ".join(labels)
-                    safe_url = urls[0].replace('"', '')
-                    pr_cell.value = f'=HYPERLINK("{safe_url}","{display}")'
-                    pr_cell.font = Font(color="7C3AED", underline="single", bold=True)
-
+                # Apply healed style (soft violet background + deep purple font)
                 fill = PatternFill("solid", "E8DFFF")
                 font = Font(color="4C1D95", bold=True)
                 for c in range(1, ws.max_column + 1):
                     cell = ws.cell(row=r, column=c)
                     cell.fill = fill
-                    if c != pr_link_idx and c != jira_id_idx:
+                    if c != pr_app_idx and c != pr_tests_idx and c != jira_id_idx:
                         cell.font = font
                 
-                updated_count += 1
+                if row_updated:
+                    updated_count += 1
 
         if updated_count > 0:
             print(f"[+] Test Details sheet: patched {updated_count} rows.")
@@ -363,73 +376,67 @@ def update_excel_report(pr_url, run_id=None):
         if "Healed Tests" in wb.sheetnames:
             ws_h = wb["Healed Tests"]
             h_headers = [ws_h.cell(row=1, column=col).value for col in range(1, ws_h.max_column + 1)]
-            h_pr_idx = (h_headers.index("PR Link") + 1) if "PR Link" in h_headers else None
+            h_pr_app_idx = (h_headers.index("PR Link (App)") + 1) if "PR Link (App)" in h_headers else None
+            h_pr_tests_idx = (h_headers.index("PR Link (Tests)") + 1) if "PR Link (Tests)" in h_headers else None
             h_jira_idx = (h_headers.index("Jira Link") + 1) if "Jira Link" in h_headers else None
             h_tcid_idx = (h_headers.index("Test Case ID") + 1) if "Test Case ID" in h_headers else None
             h_name_idx = (h_headers.index("Test Case Name") + 1) if "Test Case Name" in h_headers else None
 
-            if h_pr_idx:
-                for r in range(2, ws_h.max_row + 1):
-                    pr_cell_h = ws_h.cell(row=r, column=h_pr_idx)
-                    tc_id_h = ws_h.cell(row=r, column=h_tcid_idx).value if h_tcid_idx else None
-                    tc_name_h = ws_h.cell(row=r, column=h_name_idx).value if h_name_idx else None
+            for r in range(2, ws_h.max_row + 1):
+                tc_id_h = ws_h.cell(row=r, column=h_tcid_idx).value if h_tcid_idx else None
+                tc_name_h = ws_h.cell(row=r, column=h_name_idx).value if h_name_idx else None
 
-                    # Populate Jira Link if missing
-                    res_h = json_map.get(tc_id_h) or json_map.get(tc_name_h)
-                    if h_jira_idx and res_h:
-                        jira_cell_h = ws_h.cell(row=r, column=h_jira_idx)
-                        jira_val_h = jira_cell_h.value
-                        if not jira_val_h or str(jira_val_h).strip() in ("", "N/A", "None"):
-                            jira_id_h = res_h.get("jira_id", "")
-                            jira_url_h = res_h.get("jira_url", "")
-                            if jira_id_h and jira_url_h:
-                                jira_cell_h.value = f'=HYPERLINK("{jira_url_h}","{jira_id_h}")'
-                                jira_cell_h.font = Font(color="0563C1", underline="single", bold=True)
-                            elif jira_id_h:
-                                jira_cell_h.value = jira_id_h
-                                jira_cell_h.font = Font(color="0563C1", bold=True)
+                # Populate Jira Link if missing
+                res_h = json_map.get(tc_id_h) or json_map.get(tc_name_h)
+                if h_jira_idx and res_h:
+                    jira_cell_h = ws_h.cell(row=r, column=h_jira_idx)
+                    jira_val_h = jira_cell_h.value
+                    if not jira_val_h or str(jira_val_h).strip() in ("", "N/A", "None"):
+                        jira_id_h = res_h.get("jira_id", "")
+                        jira_url_h = res_h.get("jira_url", "")
+                        if jira_id_h and jira_url_h:
+                            jira_cell_h.value = f'=HYPERLINK("{jira_url_h}","{jira_id_h}")'
+                            jira_cell_h.font = Font(color="0563C1", underline="single", bold=True)
+                        elif jira_id_h:
+                            jira_cell_h.value = jira_id_h
+                            jira_cell_h.font = Font(color="0563C1", bold=True)
 
-                    # Collect and write real PR URLs
-                    existing_val = pr_cell_h.value
-                    urls_h = []
-                    if pr_url:
-                        urls_h.append(pr_url)
-                    for u in extract_urls_from_cell(existing_val):
-                        if u not in urls_h:
-                            urls_h.append(u)
-                    if res_h and res_h.get("pr_url"):
-                        for u in str(res_h.get("pr_url")).split(","):
-                            u_clean = u.strip()
-                            if u_clean and u_clean.startswith("http") and u_clean not in urls_h:
-                                urls_h.append(u_clean)
+                # Update the new incoming PR URL to the appropriate column
+                is_test_pr = "agentic_pipeline_tests" in pr_url
+                target_col_h = h_pr_tests_idx if is_test_pr else h_pr_app_idx
+                if target_col_h:
+                    pr_cell_h = ws_h.cell(row=r, column=target_col_h)
+                    pr_cell_h.value = pr_url
 
-                    # Keep only real /pull/ URLs
-                    urls_h = [u for u in urls_h if "/tree/" not in u and "/pull/" in u]
-                    if not urls_h and pr_url and "/pull/" in pr_url:
-                        urls_h = [pr_url]
+                # Also populate other column if we have a mapped pr_url in JSON
+                if res_h and res_h.get("pr_url"):
+                    for u in str(res_h.get("pr_url")).split(","):
+                        u_clean = u.strip()
+                        if u_clean and u_clean.startswith("http") and "/pull/" in u_clean:
+                            u_is_test = "agentic_pipeline_tests" in u_clean
+                            other_col_h = h_pr_tests_idx if u_is_test else h_pr_app_idx
+                            if other_col_h:
+                                other_cell_h = ws_h.cell(row=r, column=other_col_h)
+                                if not other_cell_h.value or str(other_cell_h.value).strip() in ("", "None", "N/A"):
+                                    other_cell_h.value = u_clean
 
-                    if not urls_h:
-                        continue  # nothing to write
-
-                    if len(urls_h) == 1:
-                        su = urls_h[0]
-                        pr_num_h = su.rstrip('/').split('/')[-1]
-                        repo_lbl = "App" if "agentic_pipeline_tests" not in su else "Tests"
-                        pr_txt = f"PR #{pr_num_h} ({repo_lbl})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({repo_lbl})"
-                        pr_cell_h.value = f'=HYPERLINK("{su}","{pr_txt}")'
-                        pr_cell_h.font = Font(color="7C3AED", underline="single", bold=True)
-                    else:
-                        labels_h = []
-                        for u in urls_h:
-                            pr_num_h = u.rstrip('/').split('/')[-1]
-                            repo_lbl = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                            lbl = f"PR #{pr_num_h} ({repo_lbl})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({repo_lbl})"
-                            labels_h.append(lbl)
-                        display_h = " · ".join(labels_h)
-                        safe_url_h = urls_h[0].replace('"', '')
-                        pr_cell_h.value = f'=HYPERLINK("{safe_url_h}","{display_h}")'
-                        pr_cell_h.font = Font(color="7C3AED", underline="single", bold=True)
-
+                # Now style both columns if they have pull requests!
+                row_updated = False
+                for col_idx, is_test_col in [(h_pr_app_idx, False), (h_pr_tests_idx, True)]:
+                    if col_idx:
+                        cell_h = ws_h.cell(row=r, column=col_idx)
+                        val_h = cell_h.value
+                        if val_h and str(val_h).strip() and not str(val_h).startswith("="):
+                            safe_url_h = str(val_h).replace('"', '').strip()
+                            if "/pull/" in safe_url_h:
+                                pr_num_h = safe_url_h.rstrip('/').split('/')[-1]
+                                label_h = "Tests" if is_test_col else "App"
+                                pr_txt = f"PR #{pr_num_h} ({label_h})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({label_h})"
+                                cell_h.value = f'=HYPERLINK("{safe_url_h}","{pr_txt}")'
+                                cell_h.font = Font(color="7C3AED", underline="single", bold=True)
+                                row_updated = True
+                
+                if row_updated:
                     healed_count_h += 1
 
             print(f"[+] Healed Tests sheet: patched {healed_count_h} rows.")

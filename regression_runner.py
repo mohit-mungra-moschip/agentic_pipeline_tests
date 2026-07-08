@@ -384,6 +384,7 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                         
                     # PR URL mapping
                     if jrh:
+                        result["is_healed"] = True
                         if state.get("pr_links"):
                             result["pr_url"] = ",".join(state.get("pr_links"))
                         else:

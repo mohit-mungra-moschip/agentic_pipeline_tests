@@ -1090,7 +1090,8 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                 print(f"AI Summary Parse Failed: {e}")
 
             # PR Link lookup
-            pr_link = ""
+            pr_link_app = ""
+            pr_link_tests = ""
             is_healed = False
             if ai_state:
                 jira_healed_map = {j["test_name"]: j for j in ai_state.get("jira_results_healed", [])}
@@ -1102,8 +1103,11 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                 if ai_state.get("pr_links"):
                     # Only store real /pull/ URLs — filter out any /tree/ placeholders
                     real_prs = [str(u) for u in ai_state.get("pr_links") if u and "/pull/" in str(u)]
-                    pr_link = ",".join(real_prs) if real_prs else ""
-                # No fallback /tree/ URL — update_reports_pr.py will fill the real URL after PR creation
+                    for u in real_prs:
+                        if "agentic_pipeline_tests" in u:
+                            pr_link_tests = u
+                        else:
+                            pr_link_app = u
 
             results.append({
                 **module_info,
@@ -1116,7 +1120,8 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                 "Suggested Fix": suggested_fix,
                 "Short Summary": short_summary,
                 "Jira Link": f'=HYPERLINK("{jira_link}","{jira_id}")' if (jira_id and jira_link) else (jira_id or ""),
-                "PR Link": pr_link,
+                "PR Link (App)": pr_link_app,
+                "PR Link (Tests)": pr_link_tests,
                 "Screenshot": screenshot_path,
                 "Executed At": datetime.now().strftime("%Y_%m_%d-%H_%M_%S"),
                 "IsHealed": is_healed,
@@ -1838,12 +1843,13 @@ def _create_excel_report(test_results, output_file):
     jira_link_idx = df.columns.get_loc("Jira Link") + 1 if "Jira Link" in df.columns else None
     msg_idx = df.columns.get_loc("Message") + 1 if "Message" in df.columns else None
 
-    pr_link_idx = df.columns.get_loc("PR Link") + 1 if "PR Link" in df.columns else None
+    pr_app_idx = df.columns.get_loc("PR Link (App)") + 1 if "PR Link (App)" in df.columns else None
+    pr_tests_idx = df.columns.get_loc("PR Link (Tests)") + 1 if "PR Link (Tests)" in df.columns else None
 
     for r, row in enumerate(dataframe_to_rows(df, index=False, header=False), start=2):
         ws_details.append(row)
-        # _apply_status_row_style(ws_details, r, status_idx, jira_link_idx, pr_link_idx)
-        _apply_status_row_style(ws_details, r, status_idx, jira_link_idx, pr_link_idx)
+        # Pass pr_app_idx or pr_tests_idx as the pr_link_col_idx to color healed rows violet
+        _apply_status_row_style(ws_details, r, status_idx, jira_link_idx, pr_app_idx or pr_tests_idx)
         
         # Standardize all columns to wrap text and align top-left
         for col_idx in range(1, ws_details.max_column + 1):
@@ -1856,25 +1862,28 @@ def _create_excel_report(test_results, output_file):
             if val and str(val).startswith("=HYPERLINK"):
                 cell.font = Font(color="0563C1", underline="single", bold=True)
 
-        # PR Link — always clickable: single =HYPERLINK; multi uses first URL, combined label
-        if pr_link_idx:
-            cell = ws_details.cell(row=r, column=pr_link_idx)
-            url_raw = cell.value
-            if url_raw and str(url_raw).strip():
-                # Only real /pull/ URLs
-                urls = [u.strip() for u in str(url_raw).split(",")
-                        if u.strip().startswith("http") and "/pull/" in u and "/tree/" not in u]
-                if urls:
-                    labels = []
-                    for u in urls:
-                        pr_num = u.rstrip('/').split('/')[-1]
-                        repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                        lbl = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                        labels.append(lbl)
-                    display = " · ".join(labels)
-                    # Always use first URL as the clickable target
-                    safe_url = urls[0].replace('"', '')
-                    cell.value = f'=HYPERLINK("{safe_url}","{display}")'
+        # PR Link (App) — clickable HYPERLINK
+        if pr_app_idx:
+            cell = ws_details.cell(row=r, column=pr_app_idx)
+            val = cell.value
+            if val and str(val).strip() and not str(val).startswith("="):
+                safe_url = str(val).replace('"', '').strip()
+                if "/pull/" in safe_url:
+                    pr_num = safe_url.rstrip('/').split('/')[-1]
+                    pr_text = f"PR #{pr_num} (App)" if (pr_num and pr_num.isdigit()) else "PR (App)"
+                    cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
+                    cell.font = Font(color="7C3AED", underline="single", bold=True)
+
+        # PR Link (Tests) — clickable HYPERLINK
+        if pr_tests_idx:
+            cell = ws_details.cell(row=r, column=pr_tests_idx)
+            val = cell.value
+            if val and str(val).strip() and not str(val).startswith("="):
+                safe_url = str(val).replace('"', '').strip()
+                if "/pull/" in safe_url:
+                    pr_num = safe_url.rstrip('/').split('/')[-1]
+                    pr_text = f"PR #{pr_num} (Tests)" if (pr_num and pr_num.isdigit()) else "PR (Tests)"
+                    cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                     cell.font = Font(color="7C3AED", underline="single", bold=True)
 
     ws_details.freeze_panes = "D2"
@@ -1947,7 +1956,8 @@ def _create_excel_report(test_results, output_file):
 
         status_idx_h   = hdf.columns.get_loc("Status") + 1
         jira_link_idx_h = hdf.columns.get_loc("Jira Link") + 1 if "Jira Link" in hdf.columns else None
-        pr_link_idx_h   = hdf.columns.get_loc("PR Link") + 1 if "PR Link" in hdf.columns else None
+        pr_app_idx_h   = hdf.columns.get_loc("PR Link (App)") + 1 if "PR Link (App)" in hdf.columns else None
+        pr_tests_idx_h = hdf.columns.get_loc("PR Link (Tests)") + 1 if "PR Link (Tests)" in hdf.columns else None
 
         for r, row in enumerate(dataframe_to_rows(hdf, index=False, header=False), start=2):
             ws_healed.append(row)
@@ -1968,23 +1978,28 @@ def _create_excel_report(test_results, output_file):
                     # plain Jira ID with no URL — still style it
                     cell.font = Font(color="0563C1", bold=True)
 
-            # PR Link — always clickable: single =HYPERLINK; multi uses first URL, combined label
-            if pr_link_idx_h:
-                cell = ws_healed.cell(row=r, column=pr_link_idx_h)
-                url_raw = cell.value
-                if url_raw and str(url_raw).strip():
-                    urls_h = [u.strip() for u in str(url_raw).split(",")
-                              if u.strip().startswith("http") and "/pull/" in u and "/tree/" not in u]
-                    if urls_h:
-                        labels_h = []
-                        for u in urls_h:
-                            pr_num = u.rstrip('/').split('/')[-1]
-                            repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                            lbl = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                            labels_h.append(lbl)
-                        display_h = " · ".join(labels_h)
-                        safe_url_h = urls_h[0].replace('"', '')
-                        cell.value = f'=HYPERLINK("{safe_url_h}","{display_h}")'
+            # PR Link (App) — clickable HYPERLINK
+            if pr_app_idx_h:
+                cell = ws_healed.cell(row=r, column=pr_app_idx_h)
+                val = cell.value
+                if val and str(val).strip() and not str(val).startswith("="):
+                    safe_url = str(val).replace('"', '').strip()
+                    if "/pull/" in safe_url:
+                        pr_num = safe_url.rstrip('/').split('/')[-1]
+                        pr_text = f"PR #{pr_num} (App)" if (pr_num and pr_num.isdigit()) else "PR (App)"
+                        cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
+                        cell.font = Font(color="7C3AED", underline="single", bold=True)
+
+            # PR Link (Tests) — clickable HYPERLINK
+            if pr_tests_idx_h:
+                cell = ws_healed.cell(row=r, column=pr_tests_idx_h)
+                val = cell.value
+                if val and str(val).strip() and not str(val).startswith("="):
+                    safe_url = str(val).replace('"', '').strip()
+                    if "/pull/" in safe_url:
+                        pr_num = safe_url.rstrip('/').split('/')[-1]
+                        pr_text = f"PR #{pr_num} (Tests)" if (pr_num and pr_num.isdigit()) else "PR (Tests)"
+                        cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                         cell.font = Font(color="7C3AED", underline="single", bold=True)
 
         ws_healed.freeze_panes = "D2"
