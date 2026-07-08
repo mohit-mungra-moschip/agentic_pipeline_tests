@@ -332,15 +332,16 @@ def update_excel_report(pr_url, run_id=None):
                     pr_cell.value = f'=HYPERLINK("{single_url}","{pr_text}")'
                     pr_cell.font = Font(color="7C3AED", underline="single", bold=True)
                 elif len(urls) > 1:
-                    lines = []
+                    labels = []
                     for u in urls:
                         pr_num = u.rstrip('/').split('/')[-1]
                         repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                        pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                        lines.append(f"{pr_text}: {u}")
-                    pr_cell.value = "\n".join(lines)
+                        lbl = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
+                        labels.append(lbl)
+                    display = " · ".join(labels)
+                    safe_url = urls[0].replace('"', '')
+                    pr_cell.value = f'=HYPERLINK("{safe_url}","{display}")'
                     pr_cell.font = Font(color="7C3AED", underline="single", bold=True)
-                    pr_cell.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
 
                 fill = PatternFill("solid", "E8DFFF")
                 font = Font(color="4C1D95", bold=True)
@@ -418,15 +419,16 @@ def update_excel_report(pr_url, run_id=None):
                         pr_cell_h.value = f'=HYPERLINK("{su}","{pr_txt}")'
                         pr_cell_h.font = Font(color="7C3AED", underline="single", bold=True)
                     else:
-                        lines_h = []
+                        labels_h = []
                         for u in urls_h:
                             pr_num_h = u.rstrip('/').split('/')[-1]
                             repo_lbl = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                            pr_txt = f"PR #{pr_num_h} ({repo_lbl})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({repo_lbl})"
-                            lines_h.append(f"{pr_txt}: {u}")
-                        pr_cell_h.value = "\n".join(lines_h)
+                            lbl = f"PR #{pr_num_h} ({repo_lbl})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({repo_lbl})"
+                            labels_h.append(lbl)
+                        display_h = " · ".join(labels_h)
+                        safe_url_h = urls_h[0].replace('"', '')
+                        pr_cell_h.value = f'=HYPERLINK("{safe_url_h}","{display_h}")'
                         pr_cell_h.font = Font(color="7C3AED", underline="single", bold=True)
-                        pr_cell_h.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
 
                     healed_count_h += 1
 

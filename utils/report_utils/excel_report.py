@@ -1349,12 +1349,16 @@ def _apply_status_row_style(ws, row_idx, status_col_idx, jira_id_col_idx=None, p
 
     if status == "PASSED":
         if is_traceable:
-            # Highlight healed/traceable test in soft violet
+            # Healed / traceable test — soft violet
             fill, font = PatternFill("solid", "E8DFFF"), Font(color="4C1D95", bold=True)
         else:
             fill, font = PatternFill("solid", "C6EFCE"), Font(color="006100", bold=True)
     elif status in ("FAILED", "ERROR"):
-        fill, font = PatternFill("solid", "FFC7CE"), Font(color="9C0006", bold=True)
+        if is_traceable:
+            # FAILED in the initial XML but has Jira/PR link → it was healed — show violet
+            fill, font = PatternFill("solid", "E8DFFF"), Font(color="4C1D95", bold=True)
+        else:
+            fill, font = PatternFill("solid", "FFC7CE"), Font(color="9C0006", bold=True)
     elif status == "SKIPPED":
         fill, font = PatternFill("solid", "D9D9D9"), Font(bold=True)
     else:
@@ -1728,14 +1732,7 @@ def _create_excel_report(test_results, output_file):
                 2
             )
 
-            ai_failures = len(
-                fdf[
-                    (
-                        fdf["Suggested Fix"]
-                        != "No fix required"
-                    )
-                ]
-            )
+            # ai_failures variable removed — Healed count covers AI intervention
 
             summary_rows.append({
 
@@ -1754,8 +1751,6 @@ def _create_excel_report(test_results, output_file):
                 "Pass Rate": f"{pass_rate}%",
 
                 "Execution Duration (s)": execution_duration,
-
-                "AI Failures": ai_failures
             })
 
         mdf = pd.DataFrame(
@@ -1861,29 +1856,26 @@ def _create_excel_report(test_results, output_file):
             if val and str(val).startswith("=HYPERLINK"):
                 cell.font = Font(color="0563C1", underline="single", bold=True)
 
-        # PR Link — handle single or comma-separated multi-PR URLs
+        # PR Link — always clickable: single =HYPERLINK; multi uses first URL, combined label
         if pr_link_idx:
             cell = ws_details.cell(row=r, column=pr_link_idx)
             url_raw = cell.value
             if url_raw and str(url_raw).strip():
-                urls = [u.strip() for u in str(url_raw).split(",") if u.strip().startswith("http")]
-                if len(urls) == 1:
-                    safe_url = urls[0].replace('"', '')
-                    pr_num = safe_url.rstrip('/').split('/')[-1]
-                    repo_label = "App" if "agentic_pipeline_tests" not in safe_url else "Tests"
-                    pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                    cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
-                    cell.font = Font(color="7C3AED", underline="single", bold=True)
-                elif len(urls) > 1:
-                    lines = []
+                # Only real /pull/ URLs
+                urls = [u.strip() for u in str(url_raw).split(",")
+                        if u.strip().startswith("http") and "/pull/" in u and "/tree/" not in u]
+                if urls:
+                    labels = []
                     for u in urls:
                         pr_num = u.rstrip('/').split('/')[-1]
                         repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                        pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                        lines.append(f"{pr_text}: {u}")
-                    cell.value = "\n".join(lines)
+                        lbl = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
+                        labels.append(lbl)
+                    display = " · ".join(labels)
+                    # Always use first URL as the clickable target
+                    safe_url = urls[0].replace('"', '')
+                    cell.value = f'=HYPERLINK("{safe_url}","{display}")'
                     cell.font = Font(color="7C3AED", underline="single", bold=True)
-                    cell.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
 
     ws_details.freeze_panes = "D2"
     ws_details.auto_filter.ref = ws_details.dimensions
@@ -1976,29 +1968,24 @@ def _create_excel_report(test_results, output_file):
                     # plain Jira ID with no URL — still style it
                     cell.font = Font(color="0563C1", bold=True)
 
-            # PR Link — single or multi-URL
+            # PR Link — always clickable: single =HYPERLINK; multi uses first URL, combined label
             if pr_link_idx_h:
                 cell = ws_healed.cell(row=r, column=pr_link_idx_h)
                 url_raw = cell.value
                 if url_raw and str(url_raw).strip():
-                    urls = [u.strip() for u in str(url_raw).split(",") if u.strip().startswith("http")]
-                    if len(urls) == 1:
-                        safe_url = urls[0].replace('"', '')
-                        pr_num = safe_url.rstrip('/').split('/')[-1]
-                        repo_label = "App" if "agentic_pipeline_tests" not in safe_url else "Tests"
-                        pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                        cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
-                        cell.font = Font(color="7C3AED", underline="single", bold=True)
-                    elif len(urls) > 1:
-                        lines = []
-                        for u in urls:
+                    urls_h = [u.strip() for u in str(url_raw).split(",")
+                              if u.strip().startswith("http") and "/pull/" in u and "/tree/" not in u]
+                    if urls_h:
+                        labels_h = []
+                        for u in urls_h:
                             pr_num = u.rstrip('/').split('/')[-1]
                             repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
-                            pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
-                            lines.append(f"{pr_text}: {u}")
-                        cell.value = "\n".join(lines)
+                            lbl = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
+                            labels_h.append(lbl)
+                        display_h = " · ".join(labels_h)
+                        safe_url_h = urls_h[0].replace('"', '')
+                        cell.value = f'=HYPERLINK("{safe_url_h}","{display_h}")'
                         cell.font = Font(color="7C3AED", underline="single", bold=True)
-                        cell.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
 
         ws_healed.freeze_panes = "D2"
         ws_healed.auto_filter.ref = ws_healed.dimensions
