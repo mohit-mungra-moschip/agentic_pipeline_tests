@@ -1580,13 +1580,12 @@ def _create_excel_report(test_results, output_file):
     current_row += 2
 
     total = len(df)
-    passed = len(df[df["Status"] == "PASSED"])
-    failed = len(df[df["Status"].isin(["FAILED", "ERROR"])])
-    skipped = len(df[df["Status"] == "SKIPPED"])
-    
     is_healed_series = df["IsHealed"] if "IsHealed" in df.columns else pd.Series([False]*len(df))
     healed_count = len(df[is_healed_series == True])
-    pass_rate = (passed / total * 100) if total else 0
+    passed = len(df[(df["Status"] == "PASSED") & (is_healed_series != True)])
+    failed = len(df[df["Status"].isin(["FAILED", "ERROR"])])
+    skipped = len(df[df["Status"] == "SKIPPED"])
+    pass_rate = ((passed + healed_count) / total * 100) if total else 0
 
     PURPLE = PatternFill("solid", "E8DFFF")
 
@@ -1684,14 +1683,14 @@ def _create_excel_report(test_results, output_file):
 
             total_tests = len(fdf)
 
-            passed = len(
-                fdf[
-                    fdf["Status"] == "PASSED"
-                ]
-            )
-
             is_healed_fdf = fdf["IsHealed"] if "IsHealed" in fdf.columns else pd.Series([False]*len(fdf))
             healed = len(fdf[is_healed_fdf == True])
+
+            passed = len(
+                fdf[
+                    (fdf["Status"] == "PASSED") & (is_healed_fdf != True)
+                ]
+            )
 
             failed = len(
                 fdf[
@@ -1709,7 +1708,7 @@ def _create_excel_report(test_results, output_file):
 
             pass_rate = (
                 round(
-                    (passed / total_tests) * 100,
+                    ((passed + healed) / total_tests) * 100,
                     2
                 )
                 if total_tests else 0

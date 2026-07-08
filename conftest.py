@@ -165,10 +165,11 @@ def _build_html(payload: dict, json_filename: str) -> str:
     .stat-card.c-green::after{{background:linear-gradient(90deg,#16a34a,#4ade80);}}
     .stat-card.c-red::after{{background:linear-gradient(90deg,#dc2626,#f87171);}}
     .stat-card.c-amber::after{{background:linear-gradient(90deg,#d97706,#fbbf24);}}
+    .stat-card.c-purple::after{{background:linear-gradient(90deg,#7c3aed,#a78bfa);}}
     .stat-card.c-slate::after{{background:linear-gradient(90deg,#475569,#94a3b8);}}
     .stat-lbl{{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);}}
     .stat-val{{font-family:'JetBrains Mono',monospace;font-size:1.65rem;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--ink);}}
-    .stat-val.green{{color:#16a34a;}} .stat-val.red{{color:#dc2626;}} .stat-val.amber{{color:#d97706;}}
+    .stat-val.green{{color:#16a34a;}} .stat-val.red{{color:#dc2626;}} .stat-val.amber{{color:#d97706;}} .stat-val.purple{{color:#7c3aed;}}
     .stat-sub{{font-size:.7rem;color:var(--ink3);}}
 
     /* ── PASS BAR ────────────────────────────────────── */
@@ -568,14 +569,15 @@ def _build_html(payload: dict, json_filename: str) -> str:
 
   function renderStats(){{
     const s=REPORT_DATA.summary||{{}};
-    const total=s.total||0,passed=s.passed||0,failed=s.failed||0,skipped=s.skipped||0;
-    const pr=s.success_rate!=null?Number(s.success_rate).toFixed(1)+'%':(total?((passed/total)*100).toFixed(1)+'%':'0.0%');
+    const total=s.total||0,passed=s.passed||0,failed=s.failed||0,skipped=s.skipped||0,healed=s.healed||0;
+    const pr=s.success_rate!=null?Number(s.success_rate).toFixed(1)+'%':(total?(((passed+healed)/total)*100).toFixed(1)+'%':'0.0%');
     const items=[
       {{lbl:'Total Tests',val:total,   cls:'',                   accent:'c-blue', sub:'cases run'}},
       {{lbl:'Passed',        val:passed,  cls:'green',              accent:'c-green',sub:'tests passed'}},
       {{lbl:'Failed',        val:failed,  cls:failed>0?'red':'',   accent:'c-red',  sub:'tests failed'}},
+      {{lbl:'Healed',        val:healed,  cls:healed>0?'purple':'',accent:'c-purple',sub:'tests healed'}},
       {{lbl:'Skipped',       val:skipped, cls:skipped>0?'amber':'',accent:'c-amber',sub:'tests skipped'}},
-      {{lbl:'Pass Rate',     val:pr, isPct:true, pCls:pctClass(pr), accent:'c-slate',sub:passed+' / '+total+' passed'}},
+      {{lbl:'Pass Rate',     val:pr, isPct:true, pCls:pctClass(pr), accent:'c-slate',sub:(passed+healed)+' / '+total+' passed'}},
     ];
     byId('statsRow').innerHTML=items.map(i=>`<div class="stat-card ${{i.accent}}">
       <div class="stat-lbl">${{esc(i.lbl)}}</div>
@@ -586,16 +588,16 @@ def _build_html(payload: dict, json_filename: str) -> str:
 
   function renderPassBar(){{
     const s=REPORT_DATA.summary||{{}};
-    const total=s.total||1,passed=s.passed||0,failed=s.failed||0;
-    const pct=(passed/total*100).toFixed(1);
+    const total=s.total||1,passed=s.passed||0,failed=s.failed||0,healed=s.healed||0;
+    const pct=((passed+healed)/total*100).toFixed(1);
     byId('passBarWrap').innerHTML=`
       <div class="pass-bar-row">
         <span class="pass-bar-lbl">Overall Pass Rate</span>
-        <span class="pass-bar-nums"><strong>${{passed}}</strong> / ${{total}} tests passed</span>
+        <span class="pass-bar-nums"><strong>${{passed+healed}}</strong> / ${{total}} tests passed</span>
       </div>
       <div class="pass-bar-track"><div class="pass-bar-fill" style="width:${{pct}}%"></div></div>
       <div style="display:flex;justify-content:space-between;margin-top:6px">
-        <span style="font-size:.7rem;color:#16a34a;font-weight:700">&#10003; ${{passed}} Passed</span>
+        <span style="font-size:.7rem;color:#16a34a;font-weight:700">&#10003; ${{passed}} Passed${{healed?` (+${{healed}} Healed)`:''}}</span>
         <span class="pct-gradient ${{pctClass(pct)}}" style="font-size:.75rem;font-weight:800;font-family:'JetBrains Mono',monospace">${{pct}}%</span>
         <span style="font-size:.7rem;color:#dc2626;font-weight:700">${{failed}} Failed &#10007;</span>
       </div>`;
