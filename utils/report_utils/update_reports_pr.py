@@ -35,11 +35,38 @@ def find_latest_report(directory, pattern):
     files.sort(key=os.path.getmtime, reverse=True)
     return Path(files[0])
 
+def get_base_dir():
+    cwd = Path(".").resolve()
+    
+    # 1. In GitHub Actions, tests repo is checked out under "test_framework" subdirectory
+    if cwd.name == "test_framework" or os.path.basename(os.getcwd()) == "test_framework":
+        parent = cwd.parent if cwd.name == "test_framework" else Path("..").resolve()
+        if (parent / "reports").exists():
+            return parent.resolve()
+
+    # 2. Local dev where agentic_pipeline_tests is a sibling of agentic_pipeline
+    sibling_app = cwd.parent / "agentic_pipeline"
+    if sibling_app.exists() and (sibling_app / "reports").exists():
+        if cwd.name in ("agentic_pipeline_tests", "test_framework") or "tests" in cwd.name:
+            return sibling_app.resolve()
+            
+    # 3. Default to current directory if reports folder exists here and we are not in tests folder
+    if (cwd / "reports").exists() and not (cwd.name in ("agentic_pipeline_tests", "test_framework") or "tests" in cwd.name):
+        return cwd
+        
+    # 4. Fallback to parent
+    if (cwd.parent / "reports").exists():
+        return cwd.parent.resolve()
+        
+    # 5. Fallback to sibling if everything else fails
+    if sibling_app.exists():
+        return sibling_app.resolve()
+        
+    return cwd
+
 def update_json_and_html(run_id, pr_url):
     print(f"[*] Locating JSON/HTML reports for Run ID: {run_id or 'latest'}...")
-    base_dir = Path(".")
-    if not (base_dir / "reports").exists() and (base_dir.parent / "reports").exists():
-        base_dir = base_dir.parent
+    base_dir = get_base_dir()
 
     json_dir = base_dir / "reports/json"
     html_dir = base_dir / "reports/html"
@@ -120,9 +147,7 @@ def update_json_and_html(run_id, pr_url):
     return True
 
 def update_excel_report(pr_url):
-    base_dir = Path(".")
-    if not (base_dir / "reports").exists() and (base_dir.parent / "reports").exists():
-        base_dir = base_dir.parent
+    base_dir = get_base_dir()
 
     excel_path = base_dir / "reports/test_results.xlsx"
     if not excel_path.exists():
@@ -228,9 +253,7 @@ def main():
     # Send pipeline report email after reports have been patched with the PR URL
     try:
         from utils.mailer import send_pipeline_report
-        base_dir = Path(".")
-        if not (base_dir / "reports").exists() and (base_dir.parent / "reports").exists():
-            base_dir = base_dir.parent
+        base_dir = get_base_dir()
         summary_path = base_dir / "reports/ai_summary.json"
         if summary_path.exists():
             print(f"[*] Loading summary to send report email: {summary_path}")
