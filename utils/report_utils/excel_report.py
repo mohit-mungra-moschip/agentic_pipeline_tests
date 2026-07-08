@@ -1939,6 +1939,75 @@ def _create_excel_report(test_results, output_file):
         _apply_dynamic_row_heights(ws_failed, fdf, column_widths_failed)
         _apply_border(ws_failed, ws_failed.dimensions)
 
+    ws_healed = wb.create_sheet("Healed Tests")
+    PURPLE_HEADER = PatternFill("solid", "5B21B6")   # deep violet header
+    PURPLE_ROW    = PatternFill("solid", "EDE9FE")   # light lavender row bg
+    _is_healed_col2 = df["IsHealed"] if "IsHealed" in df.columns else pd.Series([False]*len(df))
+    hdf = df[_is_healed_col2 == True]
+
+    if hdf.empty:
+        ws_healed.append(["No healed tests in this run"])
+        ws_healed.cell(row=1, column=1).font = Font(bold=True, italic=True)
+    else:
+        ws_healed.append(list(hdf.columns))
+        for cell in ws_healed[1]:
+            cell.fill = PURPLE_HEADER
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        status_idx_h   = hdf.columns.get_loc("Status") + 1
+        jira_link_idx_h = hdf.columns.get_loc("Jira Link") + 1 if "Jira Link" in hdf.columns else None
+        pr_link_idx_h   = hdf.columns.get_loc("PR Link") + 1 if "PR Link" in hdf.columns else None
+
+        for r, row in enumerate(dataframe_to_rows(hdf, index=False, header=False), start=2):
+            ws_healed.append(row)
+
+            # Purple row background
+            for col_idx in range(1, ws_healed.max_column + 1):
+                cell = ws_healed.cell(row=r, column=col_idx)
+                cell.fill = PURPLE_ROW
+                cell.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
+
+            # Jira Link — clickable hyperlink
+            if jira_link_idx_h:
+                cell = ws_healed.cell(row=r, column=jira_link_idx_h)
+                val = cell.value
+                if val and str(val).startswith("=HYPERLINK"):
+                    cell.font = Font(color="0563C1", underline="single", bold=True)
+                elif val and str(val).strip() and not str(val).startswith("="):
+                    # plain Jira ID with no URL — still style it
+                    cell.font = Font(color="0563C1", bold=True)
+
+            # PR Link — single or multi-URL
+            if pr_link_idx_h:
+                cell = ws_healed.cell(row=r, column=pr_link_idx_h)
+                url_raw = cell.value
+                if url_raw and str(url_raw).strip():
+                    urls = [u.strip() for u in str(url_raw).split(",") if u.strip().startswith("http")]
+                    if len(urls) == 1:
+                        safe_url = urls[0].replace('"', '')
+                        pr_num = safe_url.rstrip('/').split('/')[-1]
+                        repo_label = "App" if "agentic_pipeline_tests" not in safe_url else "Tests"
+                        pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
+                        cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
+                        cell.font = Font(color="7C3AED", underline="single", bold=True)
+                    elif len(urls) > 1:
+                        lines = []
+                        for u in urls:
+                            pr_num = u.rstrip('/').split('/')[-1]
+                            repo_label = "App" if "agentic_pipeline_tests" not in u else "Tests"
+                            pr_text = f"PR #{pr_num} ({repo_label})" if (pr_num and pr_num.isdigit()) else f"PR ({repo_label})"
+                            lines.append(f"{pr_text}: {u}")
+                        cell.value = "\n".join(lines)
+                        cell.font = Font(color="7C3AED", underline="single", bold=True)
+                        cell.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
+
+        ws_healed.freeze_panes = "D2"
+        ws_healed.auto_filter.ref = ws_healed.dimensions
+        column_widths_healed = _apply_dynamic_column_widths(ws_healed, hdf)
+        _apply_dynamic_row_heights(ws_healed, hdf, column_widths_healed)
+        _apply_border(ws_healed, ws_healed.dimensions)
+
     ws_skipped = wb.create_sheet("Skipped Tests")
     sdf = df[df["Status"] == "SKIPPED"]
 
