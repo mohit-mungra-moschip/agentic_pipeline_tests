@@ -76,10 +76,20 @@ def update_json_and_html(run_id, pr_url):
         for result in payload.get("results", []):
             curr_pr = result.get("pr_url", "")
             status = result.get("status", "")
-            is_healed = (status in ("PASS", "PASSED") and result.get("jira_id")) or "ai-fix" in str(curr_pr)
+            is_healed = (status in ("PASS", "PASSED") and result.get("jira_id")) or "ai-fix" in str(curr_pr) or "/pull/" in str(curr_pr)
             if is_healed:
-                result["pr_url"] = pr_url
-                updated = True
+                existing_pr = result.get("pr_url", "")
+                if existing_pr:
+                    existing_list = [x.strip() for x in str(existing_pr).split(",") if x.strip()]
+                    # Filter out placeholder/tree links
+                    existing_list = [x for x in existing_list if "/tree/" not in x]
+                    if pr_url not in existing_list:
+                        existing_list.append(pr_url)
+                        result["pr_url"] = ",".join(existing_list)
+                        updated = True
+                else:
+                    result["pr_url"] = pr_url
+                    updated = True
 
         if updated:
             json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")

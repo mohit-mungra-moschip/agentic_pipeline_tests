@@ -385,7 +385,7 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                     # PR URL mapping
                     if jrh:
                         if state.get("pr_links"):
-                            result["pr_url"] = state.get("pr_links")[0]
+                            result["pr_url"] = ",".join(state.get("pr_links"))
                         else:
                             h_type = state.get("healing_type", "APP_HEAL")
                             repo = "agentic_pipeline_tests" if h_type == "TEST_HEAL" else "agentic_pipeline"
