@@ -461,7 +461,7 @@ def self_healing(state: AgentState) -> dict:
 
     # Prepare base contexts for failures and files
     failures_context = ""
-    for f in failures[:3]:
+    for f in failures[:8]:
         cls = cls_map.get(f.get("test_name", ""), {})
         failures_context += (
             f"\n--- FAILURE: {f.get('test_name')} ---\n"
@@ -494,7 +494,7 @@ def self_healing(state: AgentState) -> dict:
         # Prioritize files needed by the failures we are displaying
         needed_normalized = set()
         import re
-        for f in failures[:3]:
+        for f in failures[:8]:
             if f.get("file_path"):
                 needed_normalized.add(Path(f["file_path"]).as_posix().lower())
             tb = f.get("traceback", "")
@@ -511,7 +511,7 @@ def self_healing(state: AgentState) -> dict:
         
         sorted_files.sort(key=lambda x: x[0], reverse=True)
 
-        for _, path, content in sorted_files[:5]:
+        for _, path, content in sorted_files[:10]:
             if intended_healing_type == "APP_HEAL" and _is_test_file(path):
                 files_context += f"\n=== [READ-ONLY REFERENCE] {path} ===\n{content}\n"
             else:
@@ -692,7 +692,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                     passed = True
                 else:
                     original_failed_names = {f.get("test_name") for f in failures if f.get("test_name")}
-                    targeted_names = {f.get("test_name") for f in failures[:3] if f.get("test_name")}
+                    targeted_names = {f.get("test_name") for f in failures[:8] if f.get("test_name")}
                     rerun_failed_names = _parse_failed_test_names_from_xml(project_path)
                     
                     log.info(f"Self-healing verification: original={original_failed_names}, targeted={targeted_names}, rerun={rerun_failed_names}")
