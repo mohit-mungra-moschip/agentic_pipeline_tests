@@ -76,7 +76,12 @@ def _add_to_sprint(jira, issue_key: str):
 
 def _assign_issue(jira, issue_key: str, assignee_email: str):
     """Assign the issue to a user (best-effort)."""
-    target = assignee_email or ASSIGNEE_EMAIL
+    # Filter out local mock emails that won't exist in Jira
+    if assignee_email and (assignee_email.endswith(".local") or "local" in assignee_email or "regressionai" in assignee_email):
+        target = ASSIGNEE_EMAIL
+    else:
+        target = assignee_email or ASSIGNEE_EMAIL
+
     if target:
         try:
             jira.assign_issue(issue_key, target)
