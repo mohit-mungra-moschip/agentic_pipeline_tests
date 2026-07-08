@@ -583,6 +583,44 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                 console.print(f"   ⚠️  Model {model_candidate} failed: {model_exc}")
                 continue
 
+            # Auto-correct file paths if LLM specifies wrong path but unique target_content match is found
+            for fix in fixes_raw:
+                if not isinstance(fix, dict):
+                    continue
+                target_content = fix.get("target_content")
+                file_path = fix.get("file_path", "")
+                if target_content and file_path:
+                    file_path = file_path.replace("\\", "/")
+                    full_p = Path(project_path) / file_path
+                    in_current = False
+                    if full_p.exists():
+                        try:
+                            content = full_p.read_text(encoding="utf-8")
+                            if target_content in content or target_content.replace("\r\n", "\n").strip() in content.replace("\r\n", "\n"):
+                                in_current = True
+                        except Exception:
+                            pass
+                    
+                    if not in_current:
+                        found_path = None
+                        for path in relevant_files.keys():
+                            if path == file_path:
+                                continue
+                            test_p = Path(project_path) / path
+                            if test_p.exists():
+                                try:
+                                    content = test_p.read_text(encoding="utf-8")
+                                    if target_content in content or target_content.replace("\r\n", "\n").strip() in content.replace("\r\n", "\n"):
+                                        if found_path is not None:
+                                            found_path = None
+                                            break
+                                        found_path = path
+                                except Exception:
+                                    pass
+                        if found_path:
+                            console.print(f"   ℹ️  Auto-correcting wrong LLM file path from '{file_path}' to '{found_path}' (target_content matches)")
+                            fix["file_path"] = found_path
+
             # Keep backups of files we are going to modify
             backups = {}
             for fix in fixes_raw:
