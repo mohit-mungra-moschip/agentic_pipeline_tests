@@ -12,7 +12,7 @@ from RegressionAI.state import AgentState
 console = Console()
 log = get_logger("fetch_files")
 
-MAX_FILE_SIZE = 4500  # chars per file
+MAX_FILE_SIZE = 12000  # chars per file
 MAX_FILES = 10
 
 
@@ -135,12 +135,12 @@ def get_file_snippet(project_path: Path, rel_path: str, failures: list) -> str:
                         line_numbers.add(idx + 10)
                         line_numbers.add(idx + 20)
 
-    # If we still have no line numbers, return first 50 lines
+    # If we still have no line numbers, return the first part of the file up to MAX_FILE_SIZE
     if not line_numbers:
-        if num_lines <= 50:
+        if len(content) <= MAX_FILE_SIZE:
             return content
         else:
-            return "\n".join(lines[:50]) + "\n\n... [TRUNCATED - showing first 50 lines] ..."
+            return content[:MAX_FILE_SIZE] + "\n\n... [TRUNCATED to MAX_FILE_SIZE] ..."
 
     # Build windows/intervals around matching lines
     intervals = []

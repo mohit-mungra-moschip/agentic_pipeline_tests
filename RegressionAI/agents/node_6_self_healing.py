@@ -440,7 +440,7 @@ def self_healing(state: AgentState) -> dict:
 
     if has_app_bug:
         intended_healing_type = "APP_HEAL"
-        model_to_use = os.getenv("ADVANCED_HEALING_MODEL", "anthropic/claude-3-5-sonnet-20241022").strip()
+        model_to_use = os.getenv("ADVANCED_HEALING_MODEL", "groq/llama-3.3-70b-versatile").strip()
         console.print(f"   🚀 [bold magenta]Escalating to advanced model: {model_to_use}[/bold magenta] (APP_BUG detected)")
     else:
         intended_healing_type = "TEST_HEAL"
