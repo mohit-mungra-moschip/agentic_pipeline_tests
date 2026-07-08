@@ -351,6 +351,7 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
         # Locate the test_results_{run_id}.json and HTML files
         json_paths = [
             Path(f"reports/json/test_results_{run_id}.json"),
+            Path(f"reports/json/test_results_{run_id}_healed.json"),
             Path(f"reports/json/test_results_{run_id}_full_rerun.json")
         ]
 

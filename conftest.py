@@ -216,6 +216,7 @@ def _build_html(payload: dict, json_filename: str) -> str:
     .status-badge.pass{{background:#f0fdf4;color:#16a34a;border-color:#bbf7d0;}}
     .status-badge.fail{{background:#fef2f2;color:#dc2626;border-color:#fecaca;}}
     .status-badge.skipped{{background:#fffbeb;color:#d97706;border-color:#fde68a;}}
+    .status-badge.healed{{background:#f5f3ff;color:#7c3aed;border-color:#e9d5ff;}}
     .rc-question{{font-size:.84rem;color:var(--ink2);overflow:hidden;font-weight:500;display:flex;align-items:center;gap:6px;min-width:0;}}
     .rc-question .rc-name{{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}}
     .score-ring{{position:relative;width:56px;height:56px;flex-shrink:0;}}
@@ -454,8 +455,10 @@ def _build_html(payload: dict, json_filename: str) -> str:
   function uiCard(item){{
     const pass = isPass(item.status);
     const skip = isSkip(item.status);
+    const isHealed = !!item.pr_url;
     const rowCls   = pass?'pass-row':skip?'skip-row':'fail-row';
-    const badgeCls = pass?'pass':skip?'skipped':'fail';
+    const badgeCls = isHealed?'healed':(pass?'pass':skip?'skipped':'fail');
+    const badgeText = isHealed?'HEALED':item.status;
     const uid = 'rc-'+Math.random().toString(36).slice(2,8);
     const col = statusColor(item.status);
     const pct = Number(item.percentage??(pass?100:skip?50:0));
@@ -489,7 +492,7 @@ def _build_html(payload: dict, json_filename: str) -> str:
     return `<div class="rc ${{rowCls}} ${{highlightCls}}" id="${{uid}}">
       <div class="rc-row" onclick="toggleRC('${{uid}}')">
         <span class="tc-badge" title="${{esc(item.test_id)}}">${{esc(item.doc_test_case_id || item.test_id)}}</span>
-        <span class="status-badge ${{badgeCls}}">${{esc(item.status)}}</span>
+        <span class="status-badge ${{badgeCls}}">${{esc(badgeText)}}</span>
         <span class="rc-question"><span class="rc-name">${{esc(item.test_name)}}</span>${{jiraHtml}}${{prHtml}}</span>
         <div class="score-ring">
           ${{ring.svg}}
@@ -538,7 +541,7 @@ def _build_html(payload: dict, json_filename: str) -> str:
     if(mode==='pass')    f=_all.filter(r=>isPass(r.status));
     else if(mode==='fail')    f=_all.filter(r=>!isPass(r.status)&&!isSkip(r.status));
     else if(mode==='skipped') f=_all.filter(r=>isSkip(r.status));
-    else if(mode==='healed')  f=_all.filter(r=>isPass(r.status) && (r.pr_url || r.jira_url || r.jira_id));
+    else if(mode==='healed')  f=_all.filter(r=>!!r.pr_url);
     byId('uiResults').innerHTML=f.length?f.map(uiCard).join(''):`<div class="empty-state">No ${{mode}} results found.</div>`;
     byId('uiCount').textContent=f.length;
   }}

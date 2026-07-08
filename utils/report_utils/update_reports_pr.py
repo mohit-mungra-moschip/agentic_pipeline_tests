@@ -47,13 +47,15 @@ def update_json_and_html(run_id, pr_url):
     target_files = []
     if run_id:
         target_files.append((json_dir / f"test_results_{run_id}.json", html_dir / f"test_results_{run_id}.html"))
+        target_files.append((json_dir / f"test_results_{run_id}_healed.json", html_dir / f"test_results_{run_id}_healed.html"))
         target_files.append((json_dir / f"test_results_{run_id}_full_rerun.json", html_dir / f"test_results_{run_id}_full_rerun.html"))
     else:
         json_path = find_latest_report(str(json_dir), "test_results_*.json")
         if json_path:
             stem = json_path.stem
-            clean_run_id = stem.replace("test_results_", "").replace("_full_rerun", "")
+            clean_run_id = stem.replace("test_results_", "").replace("_full_rerun", "").replace("_healed", "")
             target_files.append((json_dir / f"test_results_{clean_run_id}.json", html_dir / f"test_results_{clean_run_id}.html"))
+            target_files.append((json_dir / f"test_results_{clean_run_id}_healed.json", html_dir / f"test_results_{clean_run_id}_healed.html"))
             target_files.append((json_dir / f"test_results_{clean_run_id}_full_rerun.json", html_dir / f"test_results_{clean_run_id}_full_rerun.html"))
 
     existing_targets = [(jp, hp) for jp, hp in target_files if jp.exists()]
