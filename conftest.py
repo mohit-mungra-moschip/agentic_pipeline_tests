@@ -671,9 +671,14 @@ def pytest_runtest_makereport(item, call):
             h = hashlib.md5(norm_id.encode()).hexdigest()[:6].upper()
             doc_tc_id = f"TC-{h}"
 
-        doc_desc = clean_val(parsed_doc.get("description"), default=doc.strip() if doc else "")
-        doc_steps = clean_val(parsed_doc.get("steps"), default="")
-        doc_exp = clean_val(parsed_doc.get("expected_output"), default="")
+        def clean_multiline(text):
+            if not text:
+                return ""
+            return "\n".join(line.strip() for line in str(text).splitlines()).strip()
+
+        doc_desc = clean_multiline(clean_val(parsed_doc.get("description"), default=doc.strip() if doc else ""))
+        doc_steps = clean_multiline(clean_val(parsed_doc.get("steps"), default=""))
+        doc_exp = clean_multiline(clean_val(parsed_doc.get("expected_output"), default=""))
 
         failure_reason = ""
         if status == "FAIL":

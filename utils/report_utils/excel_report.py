@@ -1294,9 +1294,17 @@ def _parse_test_docstring(classname, test_name):
                 return default
             return str(v).strip()
 
+        def clean_multiline(text):
+            if not text:
+                return ""
+            return "\n".join(line.strip() for line in str(text).splitlines()).strip()
+
         for key in result.keys():
             val = func_fields.get(key) or fallback_fields.get(key)
-            result[key] = clean_val(val, default="")
+            cleaned = clean_val(val, default="")
+            if key in ("Description", "Steps", "Expected Output"):
+                cleaned = clean_multiline(cleaned)
+            result[key] = cleaned
 
         # Fallback values if completely empty
         if not result["Test Case Name"]:
