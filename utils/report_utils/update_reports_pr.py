@@ -255,12 +255,12 @@ def update_excel_report(pr_url, run_id=None):
             ishealed_idx = headers.index("IsHealed") + 1
 
         pr_app_idx = None
-        if "PR Link (App)" in headers:
-            pr_app_idx = headers.index("PR Link (App)") + 1
+        if "Dev PR#" in headers:
+            pr_app_idx = headers.index("Dev PR#") + 1
 
         pr_tests_idx = None
-        if "PR Link (Tests)" in headers:
-            pr_tests_idx = headers.index("PR Link (Tests)") + 1
+        if "QA PR#" in headers:
+            pr_tests_idx = headers.index("QA PR#") + 1
 
         tcid_idx = None
         if "Test Case ID" in headers:
@@ -270,7 +270,7 @@ def update_excel_report(pr_url, run_id=None):
         if "Test Case Name" in headers:
             name_idx = headers.index("Test Case Name") + 1
 
-        print(f"[*] 'Status' col: {status_idx}, 'Jira Link' col: {jira_id_idx}, 'PR Link (App)' col: {pr_app_idx}, 'PR Link (Tests)' col: {pr_tests_idx}")
+        print(f"[*] 'Status' col: {status_idx}, 'Jira Link' col: {jira_id_idx}, 'Dev PR#' col: {pr_app_idx}, 'QA PR#' col: {pr_tests_idx}")
 
         updated_count = 0
         for r in range(2, ws.max_row + 1):
@@ -312,11 +312,14 @@ def update_excel_report(pr_url, run_id=None):
             is_healed = False
             if ishealed_idx:
                 is_h_val = ws.cell(row=r, column=ishealed_idx).value
-                if is_h_val in (True, 1, "TRUE", "1", "True"):
+                if is_h_val in (True, 1, "TRUE", "1", "True", "Yes", "yes", "YES"):
                     is_healed = True
             
             if not is_healed:
                 is_healed = (status == "PASSED" and has_jira) or (res and res.get("is_healed"))
+
+            if is_healed and ishealed_idx:
+                ws.cell(row=r, column=ishealed_idx).value = "Yes"
 
             if is_healed:
                 # Update the new incoming PR URL to the appropriate column
@@ -340,7 +343,7 @@ def update_excel_report(pr_url, run_id=None):
 
                 # Now style both columns if they have pull requests!
                 row_updated = False
-                for col_idx, is_test_col in [(pr_app_idx, False), (pr_tests_idx, True)]:
+                for col_idx in [pr_app_idx, pr_tests_idx]:
                     if col_idx:
                         cell = ws.cell(row=r, column=col_idx)
                         val = cell.value
@@ -348,8 +351,7 @@ def update_excel_report(pr_url, run_id=None):
                             safe_url = str(val).replace('"', '').strip()
                             if "/pull/" in safe_url:
                                 pr_num = safe_url.rstrip('/').split('/')[-1]
-                                label = "Tests" if is_test_col else "App"
-                                pr_text = f"PR #{pr_num} ({label})" if (pr_num and pr_num.isdigit()) else f"PR ({label})"
+                                pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR"
                                 cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                                 cell.font = Font(color="7C3AED", underline="single", bold=True)
                                 row_updated = True
@@ -376,8 +378,8 @@ def update_excel_report(pr_url, run_id=None):
         if "Healed Tests" in wb.sheetnames:
             ws_h = wb["Healed Tests"]
             h_headers = [ws_h.cell(row=1, column=col).value for col in range(1, ws_h.max_column + 1)]
-            h_pr_app_idx = (h_headers.index("PR Link (App)") + 1) if "PR Link (App)" in h_headers else None
-            h_pr_tests_idx = (h_headers.index("PR Link (Tests)") + 1) if "PR Link (Tests)" in h_headers else None
+            h_pr_app_idx = (h_headers.index("Dev PR#") + 1) if "Dev PR#" in h_headers else None
+            h_pr_tests_idx = (h_headers.index("QA PR#") + 1) if "QA PR#" in h_headers else None
             h_jira_idx = (h_headers.index("Jira Link") + 1) if "Jira Link" in h_headers else None
             h_tcid_idx = (h_headers.index("Test Case ID") + 1) if "Test Case ID" in h_headers else None
             h_name_idx = (h_headers.index("Test Case Name") + 1) if "Test Case Name" in h_headers else None
@@ -422,7 +424,7 @@ def update_excel_report(pr_url, run_id=None):
 
                 # Now style both columns if they have pull requests!
                 row_updated = False
-                for col_idx, is_test_col in [(h_pr_app_idx, False), (h_pr_tests_idx, True)]:
+                for col_idx in [h_pr_app_idx, h_pr_tests_idx]:
                     if col_idx:
                         cell_h = ws_h.cell(row=r, column=col_idx)
                         val_h = cell_h.value
@@ -430,8 +432,7 @@ def update_excel_report(pr_url, run_id=None):
                             safe_url_h = str(val_h).replace('"', '').strip()
                             if "/pull/" in safe_url_h:
                                 pr_num_h = safe_url_h.rstrip('/').split('/')[-1]
-                                label_h = "Tests" if is_test_col else "App"
-                                pr_txt = f"PR #{pr_num_h} ({label_h})" if (pr_num_h and pr_num_h.isdigit()) else f"PR ({label_h})"
+                                pr_txt = f"PR #{pr_num_h}" if (pr_num_h and pr_num_h.isdigit()) else "PR"
                                 cell_h.value = f'=HYPERLINK("{safe_url_h}","{pr_txt}")'
                                 cell_h.font = Font(color="7C3AED", underline="single", bold=True)
                                 row_updated = True

@@ -486,13 +486,7 @@ def _build_html(payload: dict, json_filename: str) -> str:
           const parts = prUrlClean.split('/');
           const prNum = parts[parts.length - 1];
           if (prNum && !isNaN(prNum)) {{
-            let repoLabel = '';
-            if (prUrlClean.includes('agentic_pipeline_tests')) {{
-              repoLabel = ' (Tests)';
-            }} else if (prUrlClean.includes('agentic_pipeline')) {{
-              repoLabel = ' (App)';
-            }}
-            prText = `PR #${{prNum}}${{repoLabel}}`;
+            prText = `PR #${{prNum}}`;
           }}
         }}
         prHtml += `<a href="${{esc(trimmedUrl)}}" target="_blank" rel="noopener noreferrer" style="flex-shrink:0;font-size:.62rem;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.04em;padding:2px 7px;border-radius:4px;white-space:nowrap;border:1px solid #e9d5ff;background:#f5f3ff;color:#7c3aed;text-decoration:none;display:inline-flex;align-items:center;margin-left:5px;" onclick="event.stopPropagation();">${{esc(prText)}}</a>`;

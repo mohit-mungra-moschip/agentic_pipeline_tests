@@ -1120,11 +1120,11 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                 "Suggested Fix": suggested_fix,
                 "Short Summary": short_summary,
                 "Jira Link": f'=HYPERLINK("{jira_link}","{jira_id}")' if (jira_id and jira_link) else (jira_id or ""),
-                "PR Link (App)": pr_link_app,
-                "PR Link (Tests)": pr_link_tests,
+                "Dev PR#": pr_link_app,
+                "QA PR#": pr_link_tests,
                 "Screenshot": screenshot_path,
                 "Executed At": datetime.now().strftime("%Y_%m_%d-%H_%M_%S"),
-                "IsHealed": is_healed,
+                "IsHealed": "Yes" if is_healed else "",
             })
     return results
 
@@ -1598,10 +1598,10 @@ def _create_excel_report(test_results, output_file):
     current_row += 2
 
     total = len(df)
-    is_healed_series = df["IsHealed"] if "IsHealed" in df.columns else pd.Series([False]*len(df))
-    healed_count = len(df[is_healed_series == True])
-    passed = len(df[(df["Status"] == "PASSED") & (is_healed_series != True)])
-    failed = len(df[(df["Status"].isin(["FAILED", "ERROR"])) & (is_healed_series != True)])
+    is_healed_series = df["IsHealed"].isin([True, 1, "Yes", "TRUE", "True"]) if "IsHealed" in df.columns else pd.Series([False]*len(df))
+    healed_count = len(df[is_healed_series])
+    passed = len(df[(df["Status"] == "PASSED") & (~is_healed_series)])
+    failed = len(df[(df["Status"].isin(["FAILED", "ERROR"])) & (~is_healed_series)])
     skipped = len(df[df["Status"] == "SKIPPED"])
     pass_rate = ((passed + healed_count) / total * 100) if total else 0
 
@@ -1648,7 +1648,7 @@ def _create_excel_report(test_results, output_file):
     current_row += 2
 
     fail_modules = (
-        df[(df["Status"].isin(["FAILED", "ERROR"])) & (is_healed_series != True)]
+        df[(df["Status"].isin(["FAILED", "ERROR"])) & (~is_healed_series)]
         .groupby("Feature")
         .size()
         .reset_index(name="Failures")
@@ -1701,18 +1701,18 @@ def _create_excel_report(test_results, output_file):
 
             total_tests = len(fdf)
 
-            is_healed_fdf = fdf["IsHealed"] if "IsHealed" in fdf.columns else pd.Series([False]*len(fdf))
-            healed = len(fdf[is_healed_fdf == True])
+            is_healed_fdf = fdf["IsHealed"].isin([True, 1, "Yes", "TRUE", "True"]) if "IsHealed" in fdf.columns else pd.Series([False]*len(fdf))
+            healed = len(fdf[is_healed_fdf])
 
             passed = len(
                 fdf[
-                    (fdf["Status"] == "PASSED") & (is_healed_fdf != True)
+                    (fdf["Status"] == "PASSED") & (~is_healed_fdf)
                 ]
             )
 
             failed = len(
                 fdf[
-                    (fdf["Status"].isin(["FAILED", "ERROR"])) & (is_healed_fdf != True)
+                    (fdf["Status"].isin(["FAILED", "ERROR"])) & (~is_healed_fdf)
                 ]
             )
 
@@ -1843,8 +1843,8 @@ def _create_excel_report(test_results, output_file):
     jira_link_idx = df.columns.get_loc("Jira Link") + 1 if "Jira Link" in df.columns else None
     msg_idx = df.columns.get_loc("Message") + 1 if "Message" in df.columns else None
 
-    pr_app_idx = df.columns.get_loc("PR Link (App)") + 1 if "PR Link (App)" in df.columns else None
-    pr_tests_idx = df.columns.get_loc("PR Link (Tests)") + 1 if "PR Link (Tests)" in df.columns else None
+    pr_app_idx = df.columns.get_loc("Dev PR#") + 1 if "Dev PR#" in df.columns else None
+    pr_tests_idx = df.columns.get_loc("QA PR#") + 1 if "QA PR#" in df.columns else None
 
     for r, row in enumerate(dataframe_to_rows(df, index=False, header=False), start=2):
         ws_details.append(row)
@@ -1862,7 +1862,7 @@ def _create_excel_report(test_results, output_file):
             if val and str(val).startswith("=HYPERLINK"):
                 cell.font = Font(color="0563C1", underline="single", bold=True)
 
-        # PR Link (App) — clickable HYPERLINK
+        # Dev PR# — clickable HYPERLINK
         if pr_app_idx:
             cell = ws_details.cell(row=r, column=pr_app_idx)
             val = cell.value
@@ -1870,11 +1870,11 @@ def _create_excel_report(test_results, output_file):
                 safe_url = str(val).replace('"', '').strip()
                 if "/pull/" in safe_url:
                     pr_num = safe_url.rstrip('/').split('/')[-1]
-                    pr_text = f"PR #{pr_num} (App)" if (pr_num and pr_num.isdigit()) else "PR (App)"
+                    pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR"
                     cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                     cell.font = Font(color="7C3AED", underline="single", bold=True)
 
-        # PR Link (Tests) — clickable HYPERLINK
+        # QA PR# — clickable HYPERLINK
         if pr_tests_idx:
             cell = ws_details.cell(row=r, column=pr_tests_idx)
             val = cell.value
@@ -1882,7 +1882,7 @@ def _create_excel_report(test_results, output_file):
                 safe_url = str(val).replace('"', '').strip()
                 if "/pull/" in safe_url:
                     pr_num = safe_url.rstrip('/').split('/')[-1]
-                    pr_text = f"PR #{pr_num} (Tests)" if (pr_num and pr_num.isdigit()) else "PR (Tests)"
+                    pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR"
                     cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                     cell.font = Font(color="7C3AED", underline="single", bold=True)
 
@@ -1895,8 +1895,8 @@ def _create_excel_report(test_results, output_file):
 
     ws_failed = wb.create_sheet("Failed Tests")
     # Exclude healed tests — only show genuine (non-healed) failures
-    _is_healed_col = df["IsHealed"] if "IsHealed" in df.columns else pd.Series([False]*len(df))
-    fdf = df[(df["Status"].isin(["FAILED", "ERROR"])) & (_is_healed_col != True)]
+    _is_healed_col = df["IsHealed"].isin([True, 1, "Yes", "TRUE", "True"]) if "IsHealed" in df.columns else pd.Series([False]*len(df))
+    fdf = df[(df["Status"].isin(["FAILED", "ERROR"])) & (~_is_healed_col)]
 
     if fdf.empty:
         ws_failed.append(["No failed tests"])
@@ -1941,8 +1941,8 @@ def _create_excel_report(test_results, output_file):
     ws_healed = wb.create_sheet("Healed Tests")
     PURPLE_HEADER = PatternFill("solid", "5B21B6")   # deep violet header
     PURPLE_ROW    = PatternFill("solid", "EDE9FE")   # light lavender row bg
-    _is_healed_col2 = df["IsHealed"] if "IsHealed" in df.columns else pd.Series([False]*len(df))
-    hdf = df[_is_healed_col2 == True]
+    _is_healed_col2 = df["IsHealed"].isin([True, 1, "Yes", "TRUE", "True"]) if "IsHealed" in df.columns else pd.Series([False]*len(df))
+    hdf = df[_is_healed_col2]
 
     if hdf.empty:
         ws_healed.append(["No healed tests in this run"])
@@ -1956,8 +1956,8 @@ def _create_excel_report(test_results, output_file):
 
         status_idx_h   = hdf.columns.get_loc("Status") + 1
         jira_link_idx_h = hdf.columns.get_loc("Jira Link") + 1 if "Jira Link" in hdf.columns else None
-        pr_app_idx_h   = hdf.columns.get_loc("PR Link (App)") + 1 if "PR Link (App)" in hdf.columns else None
-        pr_tests_idx_h = hdf.columns.get_loc("PR Link (Tests)") + 1 if "PR Link (Tests)" in hdf.columns else None
+        pr_app_idx_h   = hdf.columns.get_loc("Dev PR#") + 1 if "Dev PR#" in hdf.columns else None
+        pr_tests_idx_h = hdf.columns.get_loc("QA PR#") + 1 if "QA PR#" in hdf.columns else None
 
         for r, row in enumerate(dataframe_to_rows(hdf, index=False, header=False), start=2):
             ws_healed.append(row)
@@ -1978,7 +1978,7 @@ def _create_excel_report(test_results, output_file):
                     # plain Jira ID with no URL — still style it
                     cell.font = Font(color="0563C1", bold=True)
 
-            # PR Link (App) — clickable HYPERLINK
+            # Dev PR# — clickable HYPERLINK
             if pr_app_idx_h:
                 cell = ws_healed.cell(row=r, column=pr_app_idx_h)
                 val = cell.value
@@ -1986,11 +1986,11 @@ def _create_excel_report(test_results, output_file):
                     safe_url = str(val).replace('"', '').strip()
                     if "/pull/" in safe_url:
                         pr_num = safe_url.rstrip('/').split('/')[-1]
-                        pr_text = f"PR #{pr_num} (App)" if (pr_num and pr_num.isdigit()) else "PR (App)"
+                        pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR"
                         cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                         cell.font = Font(color="7C3AED", underline="single", bold=True)
 
-            # PR Link (Tests) — clickable HYPERLINK
+            # QA PR# — clickable HYPERLINK
             if pr_tests_idx_h:
                 cell = ws_healed.cell(row=r, column=pr_tests_idx_h)
                 val = cell.value
@@ -1998,7 +1998,7 @@ def _create_excel_report(test_results, output_file):
                     safe_url = str(val).replace('"', '').strip()
                     if "/pull/" in safe_url:
                         pr_num = safe_url.rstrip('/').split('/')[-1]
-                        pr_text = f"PR #{pr_num} (Tests)" if (pr_num and pr_num.isdigit()) else "PR (Tests)"
+                        pr_text = f"PR #{pr_num}" if (pr_num and pr_num.isdigit()) else "PR"
                         cell.value = f'=HYPERLINK("{safe_url}","{pr_text}")'
                         cell.font = Font(color="7C3AED", underline="single", bold=True)
 
