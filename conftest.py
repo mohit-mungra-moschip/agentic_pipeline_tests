@@ -229,14 +229,15 @@ def _build_html(payload: dict, json_filename: str) -> str:
     .detail-inner{{padding:20px;display:flex;flex-direction:column;gap:10px;}}
 
     /* row of small meta chips */
-    .meta-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}}
+    .meta-row{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}}
     .dm{{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;}}
     .dm-k{{font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;}}
     .dm-v{{font-size:.82rem;font-weight:600;color:var(--ink);}}
     .dm-v.mono{{font-family:'JetBrains Mono',monospace;}}
 
-    /* doc-info row: 3 equal columns */
-    .doc-row{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}}
+    /* doc-info row: 2 equal columns, spanning 100% total width */
+    .doc-row{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}}
+    .doc-row .t-box:only-child{{grid-column:span 2;}}
 
     /* full-width box for description / steps / expected output */
     .doc-row-full{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}}
@@ -393,12 +394,10 @@ def _build_html(payload: dict, json_filename: str) -> str:
     let html = '';
 
     /* Row 1: Module | Test Case ID */
-    if(hasStructured){{
-      const r1 = [
-        module ? tbox('Module', module)         : '<div></div>',
-        tcId   ? tbox('Test Case ID',  tcId)    : '<div></div>',
-        '<div></div>'
-      ];
+    if(module || tcId){{
+      const r1 = [];
+      if(module) r1.push(tbox('Module', module));
+      if(tcId) r1.push(tbox('Test Case ID', tcId));
       html += `<div class="doc-row">${{r1.join('')}}</div>`;
     }}
 
