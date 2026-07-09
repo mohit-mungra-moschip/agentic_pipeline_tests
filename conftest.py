@@ -86,13 +86,9 @@ def write_ui_dashboard_reports(ui_results: list[dict], session_start_time: float
 
     import os
     run_id = os.environ.get("REGRESSION_RUN_ID")
-    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    if run_id:
-        json_path = json_dir / f"test_results_{run_id}.json"
-        html_path = html_dir / f"test_results_{run_id}.html"
-    else:
-        json_path = json_dir / f"test_results_{stamp}.json"
-        html_path = html_dir / f"test_results_{stamp}.html"
+    stamp = os.environ.get("REGRESSION_RUN_STAMP") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    json_path = json_dir / f"test_results_{stamp}.json"
+    html_path = html_dir / f"test_results_{stamp}.html"
 
     payload = {
         "run_id":            run_id,
@@ -387,22 +383,21 @@ def _build_html(payload: dict, json_filename: str) -> str:
 
   /* ── doc sections: rows of 3 ── */
   function docSectionsHtml(item){{
-    const tcName = item.doc_test_case_name  || '';
     const module = item.doc_module          || '';
     const tcId   = item.doc_test_case_id    || '';
     const desc   = item.doc_description     || item.description || '';
     const steps  = item.doc_steps           || '';
     const expOut = item.doc_expected_output || '';
 
-    const hasStructured = tcName||module||tcId||steps||expOut;
+    const hasStructured = module||tcId||steps||expOut;
     let html = '';
 
-    /* Row 1: Test Case Name | Module | Test Case ID */
+    /* Row 1: Module | Test Case ID */
     if(hasStructured){{
       const r1 = [
-        tcName ? tbox('Test Case Name', tcName) : '<div></div>',
         module ? tbox('Module', module)         : '<div></div>',
         tcId   ? tbox('Test Case ID',  tcId)    : '<div></div>',
+        '<div></div>'
       ];
       html += `<div class="doc-row">${{r1.join('')}}</div>`;
     }}
@@ -486,7 +481,13 @@ def _build_html(payload: dict, json_filename: str) -> str:
           const parts = prUrlClean.split('/');
           const prNum = parts[parts.length - 1];
           if (prNum && !isNaN(prNum)) {{
-            prText = `PR #${{prNum}}`;
+            let repoLabel = '';
+            if (prUrlClean.toLowerCase().includes('agentic_pipeline_tests') || prUrlClean.toLowerCase().includes('test')) {{
+              repoLabel = ' (QA)';
+            }} else if (prUrlClean.toLowerCase().includes('agentic_pipeline') || prUrlClean.toLowerCase().includes('app')) {{
+              repoLabel = ' (Dev)';
+            }}
+            prText = `PR #${{prNum}}${{repoLabel}}`;
           }}
         }}
         prHtml += `<a href="${{esc(trimmedUrl)}}" target="_blank" rel="noopener noreferrer" style="flex-shrink:0;font-size:.62rem;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.04em;padding:2px 7px;border-radius:4px;white-space:nowrap;border:1px solid #e9d5ff;background:#f5f3ff;color:#7c3aed;text-decoration:none;display:inline-flex;align-items:center;margin-left:5px;" onclick="event.stopPropagation();">${{esc(prText)}}</a>`;
@@ -509,10 +510,9 @@ def _build_html(payload: dict, json_filename: str) -> str:
       <div class="rc-detail">
         <div class="detail-inner">
 
-          <!-- Row 1: Test Name / ID / Duration / Status -->
+          <!-- Row 1: Test Name / Duration / Status -->
           <div class="meta-row">
-            <div class="dm"><div class="dm-k">Test Name</div><div class="dm-v">${{esc(item.test_name||'—')}}</div></div>
-            <div class="dm"><div class="dm-k">Test ID</div><div class="dm-v mono">${{esc(item.test_id)}}</div></div>
+            <div class="dm"><div class="dm-k">Test Name</div><div class="dm-v">${{esc(item.doc_test_case_name||item.test_name||'—')}}</div></div>
             <div class="dm"><div class="dm-k">Duration</div><div class="dm-v mono">${{item.duration!=null?Number(item.duration).toFixed(3)+'s':'—'}}</div></div>
             <div class="dm"><div class="dm-k">Status</div><div class="dm-v" style="color:${{col.text}}">${{esc(item.status)}}</div></div>
           </div>

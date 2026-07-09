@@ -68,6 +68,7 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
 
     run_id = run_id or str(uuid.uuid4())[:8]
     os.environ["REGRESSION_RUN_ID"] = run_id
+    os.environ["REGRESSION_RUN_STAMP"] = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     should_create_jira = str(create_jira).lower() in ("true", "1", "yes")
 
     import signal
@@ -348,11 +349,12 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
         import json
         from pathlib import Path
 
-        # Locate the test_results_{run_id}.json and HTML files
+        # Locate the test_results_{run_stamp}.json and HTML files
+        run_stamp = os.environ.get("REGRESSION_RUN_STAMP") or run_id
         json_paths = [
-            Path(f"reports/json/test_results_{run_id}.json"),
-            Path(f"reports/json/test_results_{run_id}_healed.json"),
-            Path(f"reports/json/test_results_{run_id}_full_rerun.json")
+            Path(f"reports/json/test_results_{run_stamp}.json"),
+            Path(f"reports/json/test_results_{run_stamp}_healed.json"),
+            Path(f"reports/json/test_results_{run_stamp}_full_rerun.json")
         ]
 
         for json_path in json_paths:
@@ -437,7 +439,8 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
         from utils.report_utils.excel_report import _generate_excel_report_inline
         from pathlib import Path
 
-        dest = Path("reports/test_results.xlsx")
+        run_stamp = os.environ.get("REGRESSION_RUN_STAMP") or run_id
+        dest = Path(f"reports/test_results_{run_stamp}.xlsx")
         dest.parent.mkdir(parents=True, exist_ok=True)
 
         excel_file = _generate_excel_report_inline(

@@ -73,17 +73,40 @@ def update_json_and_html(run_id, pr_url):
 
     target_files = []
     if run_id:
-        target_files.append((json_dir / f"test_results_{run_id}.json", html_dir / f"test_results_{run_id}.html"))
-        target_files.append((json_dir / f"test_results_{run_id}_healed.json", html_dir / f"test_results_{run_id}_healed.html"))
-        target_files.append((json_dir / f"test_results_{run_id}_full_rerun.json", html_dir / f"test_results_{run_id}_full_rerun.html"))
-    else:
+        # 1. First, check if run_id matches the timestamp in filename directly
+        for suffix in ["", "_healed", "_full_rerun"]:
+            jp = json_dir / f"test_results_{run_id}{suffix}.json"
+            hp = html_dir / f"test_results_{run_id}{suffix}.html"
+            if jp.exists():
+                target_files.append((jp, hp))
+        
+        # 2. If not found, scan all test_results_*.json files and match run_id inside the payload
+        if not target_files:
+            for jf in json_dir.glob("test_results_*.json"):
+                try:
+                    payload = json.loads(jf.read_text(encoding="utf-8"))
+                    if str(payload.get("run_id")) == str(run_id):
+                        stem = jf.stem
+                        base_stem = stem.replace("_healed", "").replace("_full_rerun", "")
+                        for suffix in ["", "_healed", "_full_rerun"]:
+                            jp = json_dir / f"{base_stem}{suffix}.json"
+                            hp = html_dir / f"{base_stem}{suffix}.html"
+                            if jp.exists() and (jp, hp) not in target_files:
+                                target_files.append((jp, hp))
+                except Exception:
+                    pass
+                    
+    # 3. Fallback to latest run if no files matched or no run_id provided
+    if not target_files:
         json_path = find_latest_report(str(json_dir), "test_results_*.json")
         if json_path:
             stem = json_path.stem
             clean_run_id = stem.replace("test_results_", "").replace("_full_rerun", "").replace("_healed", "")
-            target_files.append((json_dir / f"test_results_{clean_run_id}.json", html_dir / f"test_results_{clean_run_id}.html"))
-            target_files.append((json_dir / f"test_results_{clean_run_id}_healed.json", html_dir / f"test_results_{clean_run_id}_healed.html"))
-            target_files.append((json_dir / f"test_results_{clean_run_id}_full_rerun.json", html_dir / f"test_results_{clean_run_id}_full_rerun.html"))
+            for suffix in ["", "_healed", "_full_rerun"]:
+                jp = json_dir / f"test_results_{clean_run_id}{suffix}.json"
+                hp = html_dir / f"test_results_{clean_run_id}{suffix}.html"
+                if jp.exists():
+                    target_files.append((jp, hp))
 
     existing_targets = [(jp, hp) for jp, hp in target_files if jp.exists()]
 
@@ -187,9 +210,45 @@ def extract_urls_from_cell(val):
 def update_excel_report(pr_url, run_id=None):
     base_dir = get_base_dir()
 
-    excel_path = base_dir / "reports/test_results.xlsx"
-    if not excel_path.exists():
-        print(f"[!] Excel report not found at {excel_path}. Skipping Excel update.")
+    reports_dir = base_dir / "reports"
+    excel_path = None
+    
+    # 1. Direct match if run_id is a timestamp format
+    if run_id:
+        ep = reports_dir / f"test_results_{run_id}.xlsx"
+        if ep.exists():
+            excel_path = ep
+            
+    # 2. Match by searching JSON files
+    if not excel_path and run_id:
+        json_dir = reports_dir / "json"
+        for jf in json_dir.glob("test_results_*.json"):
+            try:
+                payload = json.loads(jf.read_text(encoding="utf-8"))
+                if str(payload.get("run_id")) == str(run_id):
+                    stem = jf.stem.replace("_healed", "").replace("_full_rerun", "")
+                    ep = reports_dir / f"{stem}.xlsx"
+                    if ep.exists():
+                        excel_path = ep
+                        break
+            except Exception:
+                pass
+
+    # 3. Fallback to latest test_results_*.xlsx file
+    if not excel_path:
+        excel_files = list(reports_dir.glob("test_results_*.xlsx"))
+        if excel_files:
+            excel_files.sort(key=os.path.getmtime, reverse=True)
+            excel_path = excel_files[0]
+            
+    # 4. Fallback to default test_results.xlsx
+    if not excel_path:
+        ep = reports_dir / "test_results.xlsx"
+        if ep.exists():
+            excel_path = ep
+
+    if not excel_path or not excel_path.exists():
+        print(f"[!] Excel report not found. Skipping Excel update.")
         return False
 
     print(f"[*] Locating and patching Excel report: {excel_path}")
@@ -210,11 +269,19 @@ def update_excel_report(pr_url, run_id=None):
             json_files.extend(list(reports_dir.glob(f"test_results_{run_id}.json")))
             if json_dir.exists():
                 json_files.extend(list(json_dir.glob(f"test_results_{run_id}.json")))
-        
-        if not json_files:
-            json_files.extend(list(reports_dir.glob("test_results_*.json")))
-            if json_dir.exists():
-                json_files.extend(list(json_dir.glob("test_results_*.json")))
+            
+            if not json_files:
+                all_candidates = []
+                if json_dir.exists():
+                    all_candidates.extend(list(json_dir.glob("test_results_*.json")))
+                all_candidates.extend(list(reports_dir.glob("test_results_*.json")))
+                for jf in all_candidates:
+                    try:
+                        payload = json.loads(jf.read_text(encoding="utf-8"))
+                        if str(payload.get("run_id")) == str(run_id) and jf not in json_files:
+                            json_files.append(jf)
+                    except Exception:
+                        pass
                 
         for jf in json_files:
             try:
