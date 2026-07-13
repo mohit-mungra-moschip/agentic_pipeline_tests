@@ -415,7 +415,8 @@ def self_healing(state: AgentState) -> dict:
     cls_map = {c["test_name"]: c for c in classifications}
 
     env_failures      = [f for f in failures if cls_map.get(f.get("test_name", ""), {}).get("bug_type") == "ENV_ISSUE"]
-    healable_failures = [f for f in failures if cls_map.get(f.get("test_name", ""), {}).get("bug_type") != "ENV_ISSUE"]
+    # We now allow ENV_ISSUE failures to be healable as they might be due to broken URLs/credentials in files
+    healable_failures = list(failures)
 
     existing_env_issues = list(state.get("env_issues") or [])
     new_env_issues: list = []
@@ -429,18 +430,9 @@ def self_healing(state: AgentState) -> dict:
     all_env_issues = existing_env_issues + new_env_issues
 
     if env_failures:
-        console.print(f"   ⚠️  {len(env_failures)} ENV_ISSUE failure(s) detected — cannot auto-fix, surfacing in report.")
+        console.print(f"   ⚠️  {len(env_failures)} ENV_ISSUE failure(s) detected — attempting to auto-heal by adjusting code config...")
         for ef in env_failures:
             console.print(f"      ⚙️  [cyan]{ef.get('test_name', 'unknown')[:70]}[/cyan]")
-
-    if not healable_failures:
-        console.print("   ℹ️  No healable failures remain (all ENV_ISSUE). Escalating to root cause.")
-        return {
-            "healing_successful": False,
-            "status": "root_cause_analysis",
-            "healing_type": "NONE",
-            "env_issues": all_env_issues,
-        }
 
     failures = healable_failures
 
@@ -853,6 +845,11 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
     if healing_successful:
         emoji = "🐛" if final_healing_type == "APP_HEAL" else "🧪"
         console.print(f"   ✅ [bold green]{emoji} All tests PASS! Self-healing ({final_healing_type}) successful after {internal_attempt + 1} attempts.[/bold green]")
+        
+        # Filter out successfully healed env issues from the returned env_issues list
+        healed_test_names = {f.get("test_name") for f in failures}
+        remaining_env_issues = [ei for ei in all_env_issues if ei.get("test_name") not in healed_test_names]
+        
         return {
             "healing_successful": True,
             "healed_test_output": final_test_output,
@@ -862,7 +859,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
             "iteration":          iteration + 1,
             "status":             "done",
             "healing_type":       final_healing_type,
-            "env_issues":         all_env_issues,
+            "env_issues":         remaining_env_issues,
         }
     else:
         console.print(f"   ❌ All {internal_max_attempts} internal self-healing attempts failed.")
