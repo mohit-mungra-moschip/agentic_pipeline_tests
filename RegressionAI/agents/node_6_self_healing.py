@@ -565,15 +565,29 @@ def self_healing(state: AgentState) -> dict:
             for i, attempt_err in enumerate(internal_failures_history, 1):
                 failed_attempts_context += f"\n--- Failed Internal Attempt #{i} ---\n{attempt_err}\n"
 
-        prompt = f"""Fix these test failures.
-
-### IMPORTANT INSTRUCTIONS:
+        # Load project-specific instructions if available
+        project_rules_path = Path(project_path) / "project_rules.md"
+        project_rules_inst = ""
+        if project_rules_path.exists():
+            try:
+                project_rules_inst = f"\n### PROJECT-SPECIFIC RULES:\n{project_rules_path.read_text(encoding='utf-8').strip()}\n"
+            except Exception as e:
+                log.warning(f"Could not read project_rules.md: {e}")
+        else:
+            # Default fallback for this default project if not specified
+            project_rules_inst = """
+### PROJECT-SPECIFIC RULES:
 - Do NOT delete or rename existing pytest fixtures (such as 'client').
 - The test functions must accept 'client' as an argument, NOT 'async_client'.
 - Keep all existing properties, schemas, imports, and helper functions intact.
+"""
+
+        prompt = f"""Fix these test failures.
+
+### IMPORTANT INSTRUCTIONS:
 {type_instructions}
 - Provide targeted, minimal fixes that restore correct behavior while preserving the original design and completeness of the code.
-
+{project_rules_inst}
 Failure details:
 {failures_context}
 
