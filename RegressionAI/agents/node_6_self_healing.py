@@ -513,12 +513,12 @@ def self_healing(state: AgentState) -> dict:
         )
 
     if intended_healing_type == "APP_HEAL":
-        type_instructions = """- You are performing an APPLICATION FIX (APP_HEAL). You must modify ONLY the application code (e.g., relaxing validation constraints, correcting logic errors) to make the original tests pass.
+        type_instructions = """- You are performing an APPLICATION FIX (APP_HEAL). You must modify ONLY the application code or package dependency files (e.g., requirements.txt, pyproject.toml) to make the original tests pass.
 - Do NOT modify any test files. Do NOT propose any changes to files in tests/ or test_framework/ folders.
 - Do NOT delete unrelated fields, properties, schemas, or helper methods in the application files."""
     else:
-        type_instructions = """- You are performing a TEST FIX (TEST_HEAL). You must only update the test assertions and expected status codes or fields in the test files to align with the correct/current application behavior.
-- Do NOT modify any application code. Do NOT propose any changes to application files (e.g., in app/ folder)."""
+        type_instructions = """- You are performing a TEST/CONFIG FIX (TEST_HEAL). You must only update the test assertions, expected status codes, or project dependencies (e.g., requirements.txt, pyproject.toml) to align with the correct/current application behavior.
+- Do NOT modify any application logic code (e.g., in app/ folder)."""
 
     while internal_attempt < internal_max_attempts:
         console.print(f"\n   🔄 [bold blue]Sandbox Loop: Internal Attempt {internal_attempt + 1}/{internal_max_attempts}[/bold blue]")
@@ -756,6 +756,41 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                 candidate_healing_type = "TEST_HEAL"
             else:
                 candidate_healing_type = intended_healing_type
+
+            # Auto-install packages if dependency configuration was modified
+            dep_files = {"requirements.txt", "pyproject.toml", "setup.py"}
+            modified_dep_files = {Path(fix.get("file_path", "")).name for fix in current_attempt_proposed}
+            if dep_files.intersection(modified_dep_files):
+                console.print("   📦 [cyan]Detected dependency configuration change — installing packages in sandbox...[/cyan]")
+                venv_activate = os.path.join(project_path, ".venv", "bin", "activate")
+                if os.path.exists(venv_activate):
+                    install_cmds = []
+                    if "requirements.txt" in modified_dep_files:
+                        install_cmds.append("pip install -r requirements.txt")
+                    if "setup.py" in modified_dep_files or "pyproject.toml" in modified_dep_files:
+                        install_cmds.append("pip install -e .")
+                    install_cmd = f"source {venv_activate} && " + " && ".join(install_cmds)
+                    install_exec = "/bin/bash"
+                else:
+                    install_cmds = []
+                    if "requirements.txt" in modified_dep_files:
+                        install_cmds.append("pip install -r requirements.txt")
+                    if "setup.py" in modified_dep_files or "pyproject.toml" in modified_dep_files:
+                        install_cmds.append("pip install -e .")
+                    install_cmd = " && ".join(install_cmds)
+                    install_exec = None
+                try:
+                    res = subprocess.run(
+                        install_cmd, shell=True, cwd=project_path,
+                        capture_output=True, text=True, timeout=120,
+                        executable=install_exec
+                    )
+                    if res.returncode == 0:
+                        console.print("   ✅ [green]Dependency installation successful![/green]")
+                    else:
+                        console.print(f"   ❌ [red]Dependency installation failed: {res.stdout + res.stderr}[/red]")
+                except Exception as inst_err:
+                    console.print(f"   ❌ [red]Failed to run package installation: {inst_err}[/red]")
 
             # Re-run tests in sandbox
             passed = False
