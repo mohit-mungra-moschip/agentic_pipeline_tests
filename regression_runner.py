@@ -353,11 +353,22 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
 
         # Locate the test_results_{run_stamp}.json and HTML files
         run_stamp = os.environ.get("REGRESSION_RUN_STAMP") or run_id
-        json_paths = [
-            Path(f"reports/json/test_results_{run_stamp}.json"),
-            Path(f"reports/json/test_results_{run_stamp}_healed.json"),
-            Path(f"reports/json/test_results_{run_stamp}_full_rerun.json")
-        ]
+        json_paths = []
+        json_dir = Path("reports/json")
+        if json_dir.exists():
+            for jf in json_dir.glob("test_results_*.json"):
+                try:
+                    payload = json.loads(jf.read_text(encoding="utf-8"))
+                    if str(payload.get("run_id")) == str(run_id):
+                        json_paths.append(jf)
+                except Exception:
+                    pass
+        if not json_paths:
+            json_paths = [
+                Path(f"reports/json/test_results_{run_stamp}.json"),
+                Path(f"reports/json/test_results_{run_stamp}_healed.json"),
+                Path(f"reports/json/test_results_{run_stamp}_full_rerun.json")
+            ]
 
         for json_path in json_paths:
             if json_path.exists():
