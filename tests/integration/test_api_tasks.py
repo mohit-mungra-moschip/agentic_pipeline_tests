@@ -15,7 +15,7 @@ from app.database import Base, get_db
 
 
 # ── Test database setup ───────────────────────────────────────────────────────
-TEST_DB_URL = "postgresql+asyncpg://user:wrongpass@nonexistent-db-host:5432/testdb"
+TEST_DB_URL = "sqlite+aiosqlite:///./test_tasks.db"
 
 test_engine = create_async_engine(TEST_DB_URL, echo=False)
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False, class_=AsyncSession)

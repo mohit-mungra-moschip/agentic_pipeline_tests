@@ -531,7 +531,7 @@ def self_healing(state: AgentState) -> dict:
         files_context = ""
         filtered_files = {}
         for path, content in relevant_files.items():
-            if intended_healing_type == "TEST_HEAL" and not _is_test_file(path):
+            if intended_healing_type == "TEST_HEAL" and not _is_test_file(path) and Path(path).name not in ("requirements.txt", "pyproject.toml", "setup.py"):
                 continue
             # Read fresh from disk to avoid stale data (using snippet logic to stay within token limits)
             disk_content = get_file_snippet(Path(project_path), path, failures)
@@ -783,18 +783,26 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                 venv_activate = os.path.join(project_path, ".venv", "bin", "activate")
                 if os.path.exists(venv_activate):
                     install_cmds = []
-                    if "requirements.txt" in modified_dep_files:
-                        install_cmds.append("pip install -r requirements.txt")
-                    if "setup.py" in modified_dep_files or "pyproject.toml" in modified_dep_files:
-                        install_cmds.append("pip install -e .")
+                    for fix in current_attempt_proposed:
+                        fpath = fix.file_path
+                        fname = Path(fpath).name
+                        if fname == "requirements.txt":
+                            install_cmds.append(f"pip install -r {fpath}")
+                        elif fname in ("setup.py", "pyproject.toml"):
+                            folder = str(Path(fpath).parent)
+                            install_cmds.append(f"pip install -e {folder}")
                     install_cmd = f"source {venv_activate} && " + " && ".join(install_cmds)
                     install_exec = "/bin/bash"
                 else:
                     install_cmds = []
-                    if "requirements.txt" in modified_dep_files:
-                        install_cmds.append("pip install -r requirements.txt")
-                    if "setup.py" in modified_dep_files or "pyproject.toml" in modified_dep_files:
-                        install_cmds.append("pip install -e .")
+                    for fix in current_attempt_proposed:
+                        fpath = fix.file_path
+                        fname = Path(fpath).name
+                        if fname == "requirements.txt":
+                            install_cmds.append(f"pip install -r {fpath}")
+                        elif fname in ("setup.py", "pyproject.toml"):
+                            folder = str(Path(fpath).parent)
+                            install_cmds.append(f"pip install -e {folder}")
                     install_cmd = " && ".join(install_cmds)
                     install_exec = None
                 try:

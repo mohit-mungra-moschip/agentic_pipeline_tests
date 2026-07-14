@@ -238,6 +238,21 @@ def fetch_files(state: AgentState) -> dict:
             if src:
                 paths_to_fetch.add(src)
 
+    # If any traceback indicates a missing module, fetch requirements.txt files
+    is_missing_module = False
+    for f in unique_failures:
+        tb = f.get("traceback") or ""
+        msg = f.get("error_message") or ""
+        err_type = f.get("error_type") or ""
+        if "ModuleNotFoundError" in tb or "ModuleNotFoundError" in msg or "ModuleNotFoundError" in err_type or "No module named" in tb or "No module named" in msg:
+            is_missing_module = True
+            break
+            
+    if is_missing_module:
+        for req_file in ["requirements.txt", "test_framework/requirements.txt"]:
+            if (project_path / req_file).exists() or _resolve_full_path(req_file, project_path).exists():
+                paths_to_fetch.add(req_file)
+
     # Automatically resolve core application dependencies from imports (e.g. schemas, crud, models)
     dependencies = set()
     for rel_path in paths_to_fetch:
@@ -263,6 +278,9 @@ def fetch_files(state: AgentState) -> dict:
         for f in unique_failures:
             if f.get("file_path") and f["file_path"].replace("\\", "/").lower() == path_lower:
                 return 100
+        # Requirements / Dependencies
+        if "requirements" in path_lower or "pyproject" in path_lower or "setup.py" in path_lower:
+            return 95
         # Traceback files
         for f in unique_failures:
             if f.get("traceback") and path_lower in f["traceback"].replace("\\", "/").lower():
