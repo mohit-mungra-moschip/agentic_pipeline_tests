@@ -110,7 +110,7 @@ def get_file_snippet(project_path: Path, rel_path: str, failures: list) -> str:
             if f.get("line_number"):
                 line_numbers.add(int(f["line_number"]))
                 
-        tb = f.get("traceback", "")
+        tb = f.get("traceback") or ""
         for line in tb.splitlines():
             for fp, lnum in pattern_file_line.findall(line):
                 fp_norm = fp.replace("\\", "/").lower()
@@ -185,7 +185,7 @@ def _get_failure_key(f: dict) -> tuple:
         except (ValueError, TypeError):
             line_number = 0
     
-    tb = f.get("traceback", "")
+    tb = f.get("traceback") or ""
     if tb:
         matches = re.findall(r'File\s+"([^"]+\.py)",\s+line\s+(\d+)', tb)
         if matches:

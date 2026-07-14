@@ -41,7 +41,7 @@ def _classify_single_failure(failure: dict) -> FailureClassification:
         f"File: {failure.get('file_path', 'unknown')}\n"
         f"Error type: {failure.get('error_type', 'unknown')}\n"
         f"Error message: {failure.get('error_message', '')}\n"
-        f"Traceback:\n{failure.get('traceback', '')[:2000]}"
+        f"Traceback:\n{(failure.get('traceback') or '')[:2000]}"
     )
 
     try:
@@ -111,7 +111,7 @@ def _classify_failures_single_chunk(failures: list) -> list:
             "file_path": f.get("file_path", "unknown"),
             "error_type": f.get("error_type", "unknown"),
             "error_message": f.get("error_message", ""),
-            "traceback": f.get("traceback", "")[:1200]
+            "traceback": (f.get("traceback") or "")[:1200]
         })
 
     prompt_content = f"""Analyze the following list of test failures.

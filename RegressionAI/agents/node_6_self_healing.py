@@ -509,7 +509,7 @@ def self_healing(state: AgentState) -> dict:
             f"\n--- FAILURE: {f.get('test_name')} ---\n"
             f"Type: {cls.get('bug_type', 'unknown')}\n"
             f"Error: {f.get('error_type', '')}: {f.get('error_message', '')[:500]}\n"
-            f"Traceback:\n{f.get('traceback', '')[:1500]}\n"
+            f"Traceback:\n{(f.get('traceback') or '')[:1500]}\n"
         )
 
     if intended_healing_type == "APP_HEAL":
@@ -539,7 +539,7 @@ def self_healing(state: AgentState) -> dict:
         for f in failures[:8]:
             if f.get("file_path"):
                 needed_normalized.add(Path(f["file_path"]).as_posix().lower())
-            tb = f.get("traceback", "")
+            tb = f.get("traceback") or ""
             for m in re.findall(r"([\w/\\.-]+\.py)", tb):
                 if not any(part in m for part in (".venv", "site-packages", "Python.framework")):
                     needed_normalized.add(Path(m).as_posix().lower())

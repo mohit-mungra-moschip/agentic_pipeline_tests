@@ -136,7 +136,7 @@ def root_cause_commit_analysis(state: AgentState) -> dict:
 Test: {primary_failure.get('test_name', 'unknown')}
 File: {primary_failure.get('file_path', 'unknown')}
 Error: {primary_failure.get('error_type', '')}: {primary_failure.get('error_message', '')[:300]}
-Traceback: {primary_failure.get('traceback', '')[:1000]}
+Traceback: {(primary_failure.get('traceback') or '')[:1000]}
 
 RECENT GIT COMMITS (APP REPOSITORY):
 {app_recent_commits or '(no git history available)'}
