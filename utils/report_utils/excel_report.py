@@ -1213,6 +1213,113 @@ def _generate_excel_report_inline(root_log_dir, output_file=None, ai_state=None)
     (sd.logger or _logger).info(f"EXCEL REPORT GENERATED SUCCESSFULLY → {output_file}")
     return output_file
 
+
+def generate_excel_from_json(json_path, output_file, ai_state=None):
+    """Generate Excel report directly from a test_results JSON file.
+
+    Used after a healed run where the JUnit XML only contains the original
+    pre-healing collection errors while the JSON has all resolved results.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    json_path = _Path(json_path)
+    if not json_path.exists():
+        print(f"[excel_from_json] JSON not found: {json_path}")
+        return None
+
+    try:
+        payload = _json.loads(json_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"[excel_from_json] Failed to read JSON: {e}")
+        return None
+
+    results = []
+    for entry in payload.get("results", []):
+        test_id    = entry.get("test_id", "")
+        test_name  = entry.get("test_name", "")
+        status_raw = str(entry.get("status", "PASS")).upper()
+
+        status_map = {
+            "PASS": "PASSED", "PASSED": "PASSED",
+            "FAIL": "FAILED", "FAILED": "FAILED",
+            "ERROR": "ERROR", "SKIPPED": "SKIPPED",
+        }
+        status = status_map.get(status_raw, status_raw)
+
+        # Build dot-notation classname from test_id
+        # e.g. "test_framework/tests/integration/test_api_tasks.py::TestTaskAPI::test_create"
+        classname = ""
+        if "::" in test_id:
+            parts = test_id.split("::")
+            file_part = parts[0].replace("/", ".").replace(".py", "")
+            classname = f"{file_part}.{parts[1]}" if len(parts) >= 3 else file_part
+        else:
+            classname = test_id.replace("/", ".").replace(".py", "")
+
+        module_info = _extract_module_from_classname(classname)
+
+        doc_info = {
+            "Test Case Name":  entry.get("doc_test_case_name") or test_name,
+            "Test Case ID":    entry.get("doc_test_case_id")   or "",
+            "Module":          entry.get("doc_module")          or "",
+            "Description":     entry.get("doc_description")     or "",
+            "Steps":           entry.get("doc_steps")           or "",
+            "Expected Output": entry.get("doc_expected_output") or "",
+        }
+
+        jira_id   = entry.get("jira_id",  "") or ""
+        jira_url  = entry.get("jira_url", "") or ""
+        is_healed = bool(entry.get("is_healed"))
+        pr_url    = entry.get("pr_url",   "") or ""
+
+        # Split PR URL into dev (app repo) and QA (tests repo) buckets
+        pr_link_app = pr_link_tests = ""
+        for u in str(pr_url).split(","):
+            u = u.strip()
+            if "/pull/" in u:
+                num = u.rstrip("/").split("/")[-1]
+                if "agentic_pipeline_tests" in u:
+                    pr_link_tests = f'=HYPERLINK("{u}","PR #{num}")'
+                else:
+                    pr_link_app = f'=HYPERLINK("{u}","PR #{num}")'
+
+        message       = entry.get("failure_reason", "") or ("Test passed successfully" if status == "PASSED" else "")
+        suggested_fix = entry.get("ai_suggested_fix", "") or ""
+        short_summary = entry.get("ai_short_summary",  "") or ""
+        duration      = round(float(entry.get("duration", 0) or 0), 2)
+
+        results.append({
+            **module_info,
+            **doc_info,
+            "Suite":         "pytest",
+            "Test Class":    classname,
+            "Status":        status,
+            "Duration (s)":  duration,
+            "Message":       message,
+            "Suggested Fix": suggested_fix,
+            "Short Summary": short_summary,
+            "Jira Link":     f'=HYPERLINK("{jira_url}","{jira_id}")' if (jira_id and jira_url) else (jira_id or ""),
+            "Dev PR#":       pr_link_app,
+            "QA PR#":        pr_link_tests,
+            "Screenshot":    "",
+            "Executed At":   datetime.now().strftime("%Y_%m_%d-%H_%M_%S"),
+            "IsHealed":      "Yes" if is_healed else "",
+        })
+
+    if not results:
+        print("[excel_from_json] No test entries found in JSON.")
+        return None
+
+    try:
+        _create_excel_report(results, str(output_file))
+        print(f"[excel_from_json] Excel generated → {output_file}")
+        return str(output_file)
+    except Exception as e:
+        print(f"[excel_from_json] _create_excel_report failed: {e}")
+        return None
+
+
 def _extract_module_from_classname(
         classname: str
 ) -> dict:

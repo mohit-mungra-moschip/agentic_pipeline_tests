@@ -465,24 +465,45 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
     except Exception as e:
         console.print(f"  [yellow]⚠️  Could not update HTML report: {e}[/yellow]")
 
-    # 2. Generate Excel Report — write directly to reports/test_results.xlsx
+    # 2. Generate Excel Report — prefer healed JSON (full results), fall back to XML
     try:
-        from utils.report_utils.excel_report import _generate_excel_report_inline
+        from utils.report_utils.excel_report import generate_excel_from_json, _generate_excel_report_inline
         from pathlib import Path
 
         run_stamp = os.environ.get("REGRESSION_RUN_STAMP") or run_id
         dest = Path(f"reports/test_results_{run_stamp}.xlsx")
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        excel_file = _generate_excel_report_inline(
-            "logs",
-            output_file=str(dest),
-            ai_state=state,
-        )
+        # Find the best JSON: prefer the one with most results (healed full run)
+        best_json = None
+        json_dir = Path("reports/json")
+        if json_dir.exists():
+            import json as _j
+            candidates = []
+            for jf in json_dir.glob("test_results_*.json"):
+                try:
+                    p = _j.loads(jf.read_text(encoding="utf-8"))
+                    frid = str(p.get("run_id") or "")
+                    if (frid == str(run_id) or frid == f"{run_id}_healed"
+                            or frid.startswith(str(run_id))):
+                        candidates.append((len(p.get("results", [])), jf))
+                except Exception:
+                    pass
+            if candidates:
+                best_json = sorted(candidates, key=lambda x: -x[0])[0][1]
+
+        excel_file = None
+        if best_json:
+            excel_file = generate_excel_from_json(str(best_json), str(dest), ai_state=state)
+
+        # Fall back to XML-based generation if JSON approach failed
+        if not excel_file or not Path(excel_file).exists():
+            excel_file = _generate_excel_report_inline("logs", output_file=str(dest), ai_state=state)
+
         if excel_file and Path(excel_file).exists():
             console.print(f"  📊 [bold green]Excel Report Generated Successfully[/bold green] -> {dest}")
         else:
-            console.print("  [yellow]⚠️  Excel report generation returned empty or XML was not found.[/yellow]")
+            console.print("  [yellow]⚠️  Excel report generation returned empty or JSON/XML was not found.[/yellow]")
     except Exception as e:
         console.print(f"  [red]❌ Excel report generation failed: {e}[/red]")
 
