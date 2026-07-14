@@ -25,7 +25,7 @@ def _get_recommendation(failure: dict, classification: dict, root_cause: dict) -
     ai = AIWrapper(LLMConfig(model=ACTION_RECOMMENDER_MODEL, temperature=0.2), mode="llm")
     context = (
         f"Test: {failure.get('test_name', 'unknown')}\n"
-        f"Error: {failure.get('error_type', '')}: {failure.get('error_message', '')[:200]}\n"
+        f"Error: {failure.get('error_type') or ''}: {(failure.get('error_message') or '')[:200]}\n"
         f"Classification: {classification.get('bug_type', 'APP_BUG')} "
         f"({classification.get('confidence', 50)}%) — {classification.get('reasoning', '')}\n"
         f"Root cause commit: {(root_cause or {}).get('commit_sha', 'N/A')[:8]}\n"

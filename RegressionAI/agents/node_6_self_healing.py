@@ -424,7 +424,7 @@ def self_healing(state: AgentState) -> dict:
         cls = cls_map.get(ef.get("test_name", ""), {})
         new_env_issues.append(EnvIssue(
             test_name=ef.get("test_name", "unknown"),
-            error_message=ef.get("error_message", "")[:500],
+            error_message=(ef.get("error_message") or "")[:500],
             remediation_hint=cls.get("reasoning", "Check environment configuration, dependencies, or service availability."),
         ))
     all_env_issues = existing_env_issues + new_env_issues
@@ -508,7 +508,7 @@ def self_healing(state: AgentState) -> dict:
         failures_context += (
             f"\n--- FAILURE: {f.get('test_name')} ---\n"
             f"Type: {cls.get('bug_type', 'unknown')}\n"
-            f"Error: {f.get('error_type', '')}: {f.get('error_message', '')[:500]}\n"
+            f"Error: {f.get('error_type') or ''}: {(f.get('error_message') or '')[:500]}\n"
             f"Traceback:\n{(f.get('traceback') or '')[:1500]}\n"
         )
 
