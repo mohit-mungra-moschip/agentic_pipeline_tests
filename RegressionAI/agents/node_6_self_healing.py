@@ -784,7 +784,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                 if os.path.exists(venv_activate):
                     install_cmds = []
                     for fix in current_attempt_proposed:
-                        fpath = fix.file_path
+                        fpath = fix.get("file_path", "")
                         fname = Path(fpath).name
                         if fname == "requirements.txt":
                             install_cmds.append(f"pip install -r {fpath}")
@@ -796,7 +796,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                 else:
                     install_cmds = []
                     for fix in current_attempt_proposed:
-                        fpath = fix.file_path
+                        fpath = fix.get("file_path", "")
                         fname = Path(fpath).name
                         if fname == "requirements.txt":
                             install_cmds.append(f"pip install -r {fpath}")

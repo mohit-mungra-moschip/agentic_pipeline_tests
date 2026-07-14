@@ -242,7 +242,9 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
         _update_active_run_status("Aborted", 100, "aborted", run_id, "Pipeline aborted by user (Ctrl+C).", running=False)
         sys.exit(1)
     except Exception as exc:
+        import traceback
         console.print(f"[bold red]❌ Pipeline error: {exc}[/bold red]")
+        traceback.print_exc()
         _write_summary({}, run_id, error=str(exc))
         _update_active_run_status("Error", 100, "error", run_id, f"Pipeline error: {exc}", running=False)
         sys.exit(1)
