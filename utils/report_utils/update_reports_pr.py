@@ -85,7 +85,8 @@ def update_json_and_html(run_id, pr_url):
             for jf in json_dir.glob("test_results_*.json"):
                 try:
                     payload = json.loads(jf.read_text(encoding="utf-8"))
-                    if str(payload.get("run_id")) == str(run_id):
+                    file_run_id = str(payload.get("run_id") or "")
+                    if file_run_id == str(run_id) or file_run_id == f"{run_id}_healed" or file_run_id.startswith(str(run_id)):
                         stem = jf.stem
                         base_stem = stem.replace("_healed", "").replace("_full_rerun", "")
                         for suffix in ["", "_healed", "_full_rerun"]:
@@ -224,8 +225,8 @@ def update_excel_report(pr_url, run_id=None):
         json_dir = reports_dir / "json"
         for jf in json_dir.glob("test_results_*.json"):
             try:
-                payload = json.loads(jf.read_text(encoding="utf-8"))
-                if str(payload.get("run_id")) == str(run_id):
+                file_run_id = str(payload.get("run_id") or "")
+                if file_run_id == str(run_id) or file_run_id == f"{run_id}_healed" or file_run_id.startswith(str(run_id)):
                     stem = jf.stem.replace("_healed", "").replace("_full_rerun", "")
                     ep = reports_dir / f"{stem}.xlsx"
                     if ep.exists():
@@ -277,8 +278,8 @@ def update_excel_report(pr_url, run_id=None):
                 all_candidates.extend(list(reports_dir.glob("test_results_*.json")))
                 for jf in all_candidates:
                     try:
-                        payload = json.loads(jf.read_text(encoding="utf-8"))
-                        if str(payload.get("run_id")) == str(run_id) and jf not in json_files:
+                        file_run_id = str(payload.get("run_id") or "")
+                        if (file_run_id == str(run_id) or file_run_id == f"{run_id}_healed" or file_run_id.startswith(str(run_id))) and jf not in json_files:
                             json_files.append(jf)
                     except Exception:
                         pass

@@ -359,7 +359,8 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
             for jf in json_dir.glob("test_results_*.json"):
                 try:
                     payload = json.loads(jf.read_text(encoding="utf-8"))
-                    if str(payload.get("run_id")) == str(run_id):
+                    file_run_id = str(payload.get("run_id") or "")
+                    if file_run_id == str(run_id) or file_run_id == f"{run_id}_healed" or file_run_id.startswith(str(run_id)):
                         json_paths.append(jf)
                 except Exception:
                     pass
