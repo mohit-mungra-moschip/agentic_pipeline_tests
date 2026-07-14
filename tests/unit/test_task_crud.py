@@ -81,7 +81,7 @@ class TestTaskSchemas:
         Expected Output: todo, in_progress, done, cancelled values match.
         """
         assert TaskStatus.TODO == "todo"
-        assert TaskStatus.IN_PROGRESS == "in-progress"
+        assert TaskStatus.IN_PROGRESS.value == "in_progress"
         assert TaskStatus.DONE == "done"
         assert TaskStatus.CANCELLED == "cancelled"
 
