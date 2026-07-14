@@ -512,13 +512,17 @@ def self_healing(state: AgentState) -> dict:
             f"Traceback:\n{(f.get('traceback') or '')[:1500]}\n"
         )
 
+    has_env_issue = "ENV_ISSUE" in bug_types
     if intended_healing_type == "APP_HEAL":
         type_instructions = """- You are performing an APPLICATION FIX (APP_HEAL). You must modify ONLY the application code or package dependency files (e.g., requirements.txt, pyproject.toml) to make the original tests pass.
 - Do NOT modify any test files. Do NOT propose any changes to files in tests/ or test_framework/ folders.
 - Do NOT delete unrelated fields, properties, schemas, or helper methods in the application files."""
     else:
-        type_instructions = """- You are performing a TEST/CONFIG FIX (TEST_HEAL). You must only update the test assertions, expected status codes, or project dependencies (e.g., requirements.txt, pyproject.toml) to align with the correct/current application behavior.
+        type_instructions = """- You are performing a TEST/CONFIG/ENV FIX (TEST_HEAL). You must only update test assertions, expected status codes, database connection URLs/strings, environment configuration variables, API endpoints, or project dependencies (e.g., requirements.txt, pyproject.toml) to align with correct behavior.
 - Do NOT modify any application logic code (e.g., in app/ folder)."""
+        if has_env_issue:
+            type_instructions += """
+- CRITICAL: An environment/infrastructure issue (ENV_ISSUE) has been detected (e.g., broken connection strings, nonexistent hosts, database timeouts). Prioritize correcting database URLs, API hostnames, port configurations, or credentials in the test files to point back to stable local/in-memory endpoints (like 'sqlite+aiosqlite:///./test_tasks.db' or local mock services)."""
 
     while internal_attempt < internal_max_attempts:
         console.print(f"\n   🔄 [bold blue]Sandbox Loop: Internal Attempt {internal_attempt + 1}/{internal_max_attempts}[/bold blue]")
