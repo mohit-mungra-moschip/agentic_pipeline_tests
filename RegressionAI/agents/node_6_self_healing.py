@@ -4,7 +4,7 @@ RegressionAI/agents/self_healing.py — Self-Healing Agent (Node 6)
 Fully agentic in CI mode — no human approval.
 Uses the existing QAOps code_fixer + file_writer logic but:
   1. Skips human_approval when ci_mode=True
-  2. Skips ENV_ISSUE failures (surfaces them in env_issues instead)
+  2. Routes ENV_ISSUE failures through self-healing for configuration/URL fixes
   3. Only re-runs failed tests (not the whole suite) by default
   4. For APP_HEAL: re-runs the FULL suite after healing to verify no regressions
   5. Reports healing_type (APP_HEAL | TEST_HEAL | MIXED | NONE) back to graph
@@ -375,7 +375,7 @@ def self_healing(state: AgentState) -> dict:
     In CI mode: fully agentic (no human approval prompt).
 
     Healing logic:
-      - ENV_ISSUE: cannot auto-fix; surfaces them in env_issues for the report / Jira.
+      - ENV_ISSUE: attempts to auto-fix via configuration/URL updates; if unsuccessful, surfaces them in env_issues.
       - FLAKY:     retries up to 3 times before attempting a code fix.
       - APP_BUG:   LLM fixes app code; after success, re-runs the FULL test suite
                    to verify no regressions introduced by the change.
