@@ -387,9 +387,18 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                     test_name = result.get("test_name")
                     test_id = result.get("test_id")
                     
-                    # Check mapping via full test_id or short test_name
-                    jr = jira_map.get(test_id) or jira_map.get(test_name)
-                    jrh = jira_healed_map.get(test_id) or jira_healed_map.get(test_name)
+                    # Check mapping via full test_id, short test_name, or if the ticket test_name is a substring of test_id (e.g. file path matching)
+                    jr = None
+                    for k, v in jira_map.items():
+                        if k == test_id or k == test_name or (k.endswith('.py') and k in test_id):
+                            jr = v
+                            break
+                    
+                    jrh = None
+                    for k, v in jira_healed_map.items():
+                        if k == test_id or k == test_name or (k.endswith('.py') and k in test_id):
+                            jrh = v
+                            break
                     
                     if jr:
                         result["jira_id"] = jr.get("jira_id")
@@ -399,7 +408,7 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                         result["jira_url"] = jrh.get("jira_url")
                         
                     # PR URL mapping
-                    if jrh:
+                    if jrh or (state.get("healing_successful") and jr):
                         result["is_healed"] = True
                         if state.get("pr_links"):
                             result["pr_url"] = ",".join(state.get("pr_links"))
@@ -408,11 +417,19 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                             repo = "agentic_pipeline_tests" if h_type == "TEST_HEAL" else "agentic_pipeline"
                             result["pr_url"] = f"https://github.com/mohit-mungra-moschip/{repo}/tree/ai-fix/app-{run_id}"
                     
-                    cls = class_map.get(test_id) or class_map.get(test_name)
+                    cls = None
+                    for k, v in class_map.items():
+                        if k == test_id or k == test_name or (k.endswith('.py') and k in test_id):
+                            cls = v
+                            break
                     if cls:
                         result["ai_short_summary"] = cls.get("reasoning", "")
                         
-                    rec = rec_map.get(test_id) or rec_map.get(test_name)
+                    rec = None
+                    for k, v in rec_map.items():
+                        if k == test_id or k == test_name or (k.endswith('.py') and k in test_id):
+                            rec = v
+                            break
                     if rec:
                         result["ai_suggested_fix"] = rec.get("suggested_fix", "")
                         if rec.get("summary") and not result.get("ai_short_summary"):

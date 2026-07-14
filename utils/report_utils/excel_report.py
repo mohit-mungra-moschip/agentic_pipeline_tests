@@ -980,14 +980,20 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                         matched_test_name = None
 
                         def match_test_name(cname, rname, state_name):
-                            if not cname or not rname or not state_name:
+                            if not state_name:
                                 return False
+                            cname_str = cname or ""
+                            rname_str = rname or ""
+                            if state_name.endswith('.py'):
+                                state_module = state_name.replace('.py', '').replace('/', '.')
+                                if state_module in cname_str or state_module in rname_str:
+                                    return True
                             last_part = state_name.split("::")[-1]
-                            if rname != last_part:
+                            if rname_str != last_part:
                                 return False
-                            class_parts = cname.split(".")
+                            class_parts = cname_str.split(".")
                             for part in class_parts:
-                                if part[0].islower() and part not in state_name:
+                                if part and part[0].islower() and part not in state_name:
                                     return False
                             return True
 
@@ -1062,14 +1068,20 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                         jira_healed_map = {j["test_name"]: j for j in ai_state.get("jira_results_healed", [])}
                         matched_test_name = None
                         def match_test_name(cname, rname, state_name):
-                            if not cname or not rname or not state_name:
+                            if not state_name:
                                 return False
+                            cname_str = cname or ""
+                            rname_str = rname or ""
+                            if state_name.endswith('.py'):
+                                state_module = state_name.replace('.py', '').replace('/', '.')
+                                if state_module in cname_str or state_module in rname_str:
+                                    return True
                             last_part = state_name.split("::")[-1]
-                            if rname != last_part:
+                            if rname_str != last_part:
                                 return False
-                            class_parts = cname.split(".")
+                            class_parts = cname_str.split(".")
                             for part in class_parts:
-                                if part[0].islower() and part not in state_name:
+                                if part and part[0].islower() and part not in state_name:
                                     return False
                             return True
                         for state_test_name in jira_healed_map.keys():
@@ -1077,7 +1089,12 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
                                 matched_test_name = state_test_name
                                 break
                             # simple match fallback
-                            if raw_name in state_test_name or state_test_name in raw_name:
+                            if state_test_name.endswith('.py'):
+                                state_module = state_test_name.replace('.py', '').replace('/', '.')
+                                if state_module in (classname or "") or state_module in (raw_name or ""):
+                                    matched_test_name = state_test_name
+                                    break
+                            elif (raw_name and raw_name in state_test_name) or (raw_name and state_test_name in raw_name):
                                 matched_test_name = state_test_name
                                 break
                         if matched_test_name:
@@ -1096,7 +1113,12 @@ def _parse_junit_xml(xml_file, root_log_dir, ai_state=None):
             if ai_state:
                 jira_healed_map = {j["test_name"]: j for j in ai_state.get("jira_results_healed", [])}
                 for state_test_name in jira_healed_map.keys():
-                    if raw_name in state_test_name or state_test_name in raw_name:
+                    if state_test_name.endswith('.py'):
+                        state_module = state_test_name.replace('.py', '').replace('/', '.')
+                        if state_module in (classname or "") or state_module in (raw_name or ""):
+                            is_healed = True
+                            break
+                    elif raw_name in state_test_name or state_test_name in raw_name:
                         is_healed = True
                         break
             if is_healed:

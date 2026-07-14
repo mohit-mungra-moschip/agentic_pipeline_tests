@@ -225,6 +225,7 @@ def update_excel_report(pr_url, run_id=None):
         json_dir = reports_dir / "json"
         for jf in json_dir.glob("test_results_*.json"):
             try:
+                payload = json.loads(jf.read_text(encoding="utf-8"))
                 file_run_id = str(payload.get("run_id") or "")
                 if file_run_id == str(run_id) or file_run_id == f"{run_id}_healed" or file_run_id.startswith(str(run_id)):
                     stem = jf.stem.replace("_healed", "").replace("_full_rerun", "")
@@ -278,6 +279,7 @@ def update_excel_report(pr_url, run_id=None):
                 all_candidates.extend(list(reports_dir.glob("test_results_*.json")))
                 for jf in all_candidates:
                     try:
+                        payload = json.loads(jf.read_text(encoding="utf-8"))
                         file_run_id = str(payload.get("run_id") or "")
                         if (file_run_id == str(run_id) or file_run_id == f"{run_id}_healed" or file_run_id.startswith(str(run_id))) and jf not in json_files:
                             json_files.append(jf)
@@ -290,10 +292,16 @@ def update_excel_report(pr_url, run_id=None):
                 for res in payload.get("results", []):
                     t_id = res.get("test_id")
                     t_name = res.get("test_name")
+                    doc_tc_id = res.get("doc_test_case_id")
+                    doc_tc_name = res.get("doc_test_case_name")
                     if t_id:
                         json_map[t_id] = res
                     if t_name:
                         json_map[t_name] = res
+                    if doc_tc_id:
+                        json_map[doc_tc_id] = res
+                    if doc_tc_name:
+                        json_map[doc_tc_name] = res
             except Exception as je:
                 pass
     except Exception as e:
