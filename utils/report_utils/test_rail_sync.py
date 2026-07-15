@@ -12,8 +12,9 @@ logger = logging.getLogger("RegressionAI.TestRailSync")
 # TestRail Defaults
 TESTRAIL_URL = os.getenv("TESTRAIL_URL", "https://regression.testrail.io/").rstrip("/") + "/"
 TESTRAIL_EMAIL = os.getenv("TESTRAIL_EMAIL", "mohit.mungra@moschip.com")
-TESTRAIL_PASSWORD = os.getenv("TESTRAIL_PASSWORD", "NimDg72S93AOFi55OfAW-R7KoK0ZK6yXTZtivR.Pk")
+TESTRAIL_PASSWORD = os.getenv("TESTRAIL_PASSWORD", "MMP@welcome1234")
 TESTRAIL_PROJECT_ID = int(os.getenv("TESTRAIL_PROJECT_ID", "3"))
+TESTRAIL_SUITE_ID = os.getenv("TESTRAIL_SUITE_ID", "7")
 # If TESTRAIL_RUN_ID is not provided, we can dynamically create a new run
 TESTRAIL_RUN_ID = os.getenv("TESTRAIL_RUN_ID") 
 
@@ -26,6 +27,8 @@ def fetch_testrail_case_mapping():
     """
     auth = get_auth()
     url = f"{TESTRAIL_URL}index.php?/api/v2/get_cases/{TESTRAIL_PROJECT_ID}"
+    if TESTRAIL_SUITE_ID:
+        url += f"&suite_id={TESTRAIL_SUITE_ID}"
     
     mapping = {}
     try:
@@ -65,6 +68,8 @@ def get_or_create_test_run(case_ids):
         "include_all": False,
         "case_ids": list(case_ids)
     }
+    if TESTRAIL_SUITE_ID:
+        payload["suite_id"] = int(TESTRAIL_SUITE_ID)
     
     try:
         response = requests.post(url, auth=auth, json=payload, headers={'Content-Type': 'application/json'})
