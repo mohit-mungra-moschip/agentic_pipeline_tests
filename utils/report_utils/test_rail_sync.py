@@ -4,6 +4,10 @@ import sys
 import json
 import requests
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Ensure we can log properly
 logging.basicConfig(level=logging.INFO)
