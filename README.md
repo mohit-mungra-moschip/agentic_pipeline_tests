@@ -123,10 +123,10 @@ The RegressionAI pipeline is integrated with **TestRail** to dynamically upload 
 Add these to your `.env` file to enable TestRail sync:
 ```env
 TESTRAIL_ENABLED=true
-TESTRAIL_URL=https://test1automation.testrail.io/
-TESTRAIL_EMAIL=krupali.bhadaraka@moschip.com
-TESTRAIL_PASSWORD=Soft@123
-TESTRAIL_PROJECT_ID=1
+TESTRAIL_URL=https://regression.testrail.io/
+TESTRAIL_EMAIL=mohit.mungra@moschip.com
+TESTRAIL_PASSWORD=NimDg72S93AOFi55OfAW-R7KoK0ZK6yXTZtivR.Pk
+TESTRAIL_PROJECT_ID=3
 TESTRAIL_RUN_ID=1234  # Leave empty to dynamically create a new run per execution
 ```
 

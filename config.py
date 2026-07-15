@@ -49,9 +49,9 @@ JIRA_STATUS_COLUMN_WIDTH = 20
 # TestRail Settings
 # ------------------------------------------
 TESTRAIL_ENABLED = os.getenv("TESTRAIL_ENABLED", "false").strip().lower() in ("true", "1", "yes")
-TESTRAIL_URL = os.getenv("TESTRAIL_URL", "https://test1automation.testrail.io/")
-TESTRAIL_EMAIL = os.getenv("TESTRAIL_EMAIL", "krupali.bhadaraka@moschip.com")
-TESTRAIL_PASSWORD = os.getenv("TESTRAIL_PASSWORD", "Soft@123")
-TESTRAIL_PROJECT_ID = int(os.getenv("TESTRAIL_PROJECT_ID", "1"))
+TESTRAIL_URL = os.getenv("TESTRAIL_URL", "https://regression.testrail.io/")
+TESTRAIL_EMAIL = os.getenv("TESTRAIL_EMAIL", "mohit.mungra@moschip.com")
+TESTRAIL_PASSWORD = os.getenv("TESTRAIL_PASSWORD", "NimDg72S93AOFi55OfAW-R7KoK0ZK6yXTZtivR.Pk")
+TESTRAIL_PROJECT_ID = int(os.getenv("TESTRAIL_PROJECT_ID", "3"))
 TESTRAIL_RUN_ID = os.getenv("TESTRAIL_RUN_ID")
 
