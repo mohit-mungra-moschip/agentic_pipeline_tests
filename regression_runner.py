@@ -66,9 +66,9 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
     from rich.panel import Panel
     console = Console()
 
-    run_id = run_id or str(uuid.uuid4())[:8]
+    run_id = run_id or os.environ.get("REGRESSION_RUN_ID") or str(uuid.uuid4())[:8]
     os.environ["REGRESSION_RUN_ID"] = run_id
-    os.environ["REGRESSION_RUN_STAMP"] = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    os.environ["REGRESSION_RUN_STAMP"] = os.environ.get("REGRESSION_RUN_STAMP") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     should_create_jira = str(create_jira).lower() in ("true", "1", "yes")
 
     import signal
