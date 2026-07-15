@@ -156,7 +156,7 @@ def sync_results_to_testrail(json_report_path: str):
             "case_id": case_id,
             "status_id": status_id,
             "comment": comment,
-            "elapsed": f"{int(r.get('duration', 1))}s"
+            "elapsed": f"{max(1, int(r.get('duration') or 1))}s"
         })
 
     if not testrail_results:
