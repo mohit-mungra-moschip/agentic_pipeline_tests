@@ -44,3 +44,14 @@ JIRA_TRANSITION_NAME = "Done"
 EXCEL_RESOLVED_LABEL = "Resolved"
 COLUMN_JIRA_STATUS = "Jira Status"
 JIRA_STATUS_COLUMN_WIDTH = 20
+
+# ------------------------------------------
+# TestRail Settings
+# ------------------------------------------
+TESTRAIL_ENABLED = os.getenv("TESTRAIL_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+TESTRAIL_URL = os.getenv("TESTRAIL_URL", "https://test1automation.testrail.io/")
+TESTRAIL_EMAIL = os.getenv("TESTRAIL_EMAIL", "krupali.bhadaraka@moschip.com")
+TESTRAIL_PASSWORD = os.getenv("TESTRAIL_PASSWORD", "Soft@123")
+TESTRAIL_PROJECT_ID = int(os.getenv("TESTRAIL_PROJECT_ID", "1"))
+TESTRAIL_RUN_ID = os.getenv("TESTRAIL_RUN_ID")
+

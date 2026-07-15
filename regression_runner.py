@@ -504,6 +504,14 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
             console.print(f"  📊 [bold green]Excel Report Generated Successfully[/bold green] -> {dest}")
         else:
             console.print("  [yellow]⚠️  Excel report generation returned empty or JSON/XML was not found.[/yellow]")
+            
+        # 3. Upload results to TestRail (if configured)
+        if best_json:
+            try:
+                from utils.report_utils.test_rail_sync import sync_results_to_testrail
+                sync_results_to_testrail(str(best_json))
+            except Exception as e:
+                console.print(f"  [red]❌ TestRail sync failed: {e}[/red]")
     except Exception as e:
         console.print(f"  [red]❌ Excel report generation failed: {e}[/red]")
 

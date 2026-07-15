@@ -109,3 +109,24 @@ After every execution, the runner consolidates reports inside the `reports/` fol
 1. `test_results_<timestamp>.json`: Complete agent status, tracebacks, token usage, and applied fixes.
 2. `test_results_<timestamp>.html`: Interactive visual summary.
 3. `test_results_<timestamp>.xlsx`: Professional multi-sheet Excel dashboard featuring total counts, breakdown by modules, healed test summaries, and direct PR/Jira hyperlinks.
+
+---
+
+## 🎛️ TestRail Integration
+
+The RegressionAI pipeline is integrated with **TestRail** to dynamically upload and synchronize test results after self-healing:
+
+1. **Mapping**: Automated test cases are decorated with `@pytest.mark.testid("TC-XXX")`. When results are synced, the framework dynamically queries your TestRail project's test cases and maps the `refs` attribute (e.g. `TC-001`) to the corresponding TestRail Case ID.
+2. **Uploading Results**: Results are posted to TestRail at the end of the pipeline run. If a test has been auto-healed, its status is marked as **Passed** in TestRail, with comments detailing the applied LLM patch and the created GitHub Pull Request link.
+
+### TestRail Configuration Variables:
+Add these to your `.env` file to enable TestRail sync:
+```env
+TESTRAIL_ENABLED=true
+TESTRAIL_URL=https://test1automation.testrail.io/
+TESTRAIL_EMAIL=krupali.bhadaraka@moschip.com
+TESTRAIL_PASSWORD=Soft@123
+TESTRAIL_PROJECT_ID=1
+TESTRAIL_RUN_ID=1234  # Leave empty to dynamically create a new run per execution
+```
+
