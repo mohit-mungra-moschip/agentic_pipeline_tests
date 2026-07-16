@@ -205,7 +205,7 @@ def fetch_files(state: AgentState) -> dict:
     failures = state.get("failures", [])
     project_path = Path(state.get("project_path", "."))
 
-    console.print(f"\n[bold blue]📁 Fetch Files[/bold blue]")
+    console.print(f"\n[bold blue]Fetch Files[/bold blue]")
 
     # De-duplicate failures based on failure location to keep context size small
     unique_failures = []
@@ -309,9 +309,9 @@ def fetch_files(state: AgentState) -> dict:
         content = get_file_snippet(project_path, rel_path, failures)
         if content:
             relevant[rel_path] = content
-            console.print(f"   📄 {rel_path} ({len(content)} chars snippet)")
+            console.print(f"   {rel_path} ({len(content)} chars snippet)")
         else:
             log.warning(f"File not found or empty: {rel_path}")
 
-    console.print(f"   ✅ Fetched {len(relevant)} file(s)")
+    console.print(f"   Fetched {len(relevant)} file(s)")
     return {"relevant_files": relevant, "status": "self_healing"}

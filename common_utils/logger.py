@@ -73,12 +73,12 @@ _file_logger = _setup_file_logger()
 # ── Level colours and icons ───────────────────────────────────────────────────
 
 _LEVELS = {
-    "step":    ("bold blue",    "▶"),
-    "info":    ("dim white",    "·"),
-    "success": ("bold green",   "✔"),
-    "llm":     ("bold magenta", "⚡"),
-    "warn":    ("yellow",       "⚠"),
-    "error":   ("bold red",     "✗"),
+    "step":    ("bold blue",    ">"),
+    "info":    ("dim white",    "-"),
+    "success": ("bold green",   "*"),
+    "llm":     ("bold magenta", "~"),
+    "warn":    ("yellow",       "!"),
+    "error":   ("bold red",     "x"),
 }
 
 

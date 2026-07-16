@@ -86,14 +86,14 @@ def call_llm_with_progress(func, *args, **kwargs):
     start_time = time.time()
     while t.is_alive():
         elapsed = int(time.time() - start_time)
-        sys.stdout.write(f"\r   ⏳ Waiting for LLM batch analysis... ({elapsed}s elapsed)")
-        sys.stdout.flush()
-        time.sleep(1)
-    
+        sys.stdout.write(f"\r   Waiting for LLM batch analysis... ({elapsed}s elapsed)")
+    sys.stdout.flush()
+    time.sleep(1)
+
     # Clean output line
     sys.stdout.write("\r" + " " * 60 + "\r")
     sys.stdout.flush()
-    
+
     if error_container:
         raise error_container[0]
     return result_container[0]
@@ -200,7 +200,7 @@ def _classify_failures_parallel(failures: list) -> list:
     """Fall back to parallel classification using ThreadPoolExecutor."""
     class_map = {f.get("test_name", "unknown"): None for f in failures}
     
-    console.print(f"   ⚠️  Batch analysis failed. Falling back to parallel individual classifications...")
+    console.print(f"   Batch analysis failed. Falling back to parallel individual classifications...")
     
     with ThreadPoolExecutor(max_workers=5) as executor:
         future_to_failure = {
@@ -214,15 +214,12 @@ def _classify_failures_parallel(failures: list) -> list:
             try:
                 classification = future.result()
                 class_map[t_name] = classification
-                emoji = {"TEST_BUG": "🧪", "APP_BUG": "🐛", "ENV_ISSUE": "⚙️", "FLAKY": "🎲"}.get(
-                    classification["bug_type"], "❓"
-                )
                 console.print(
-                    f"     [{completed_count+1}/{len(failures)}] {emoji} [bold]{classification['bug_type']}[/bold] "
+                    f"     [{completed_count+1}/{len(failures)}] [bold]{classification['bug_type']}[/bold] "
                     f"for {t_name[:60]}... ({classification['confidence']}%)"
                 )
             except Exception as e:
-                console.print(f"     ❌ Failed to classify {t_name}: {e}")
+                console.print(f"     Failed to classify {t_name}: {e}")
                 class_map[t_name] = FailureClassification(
                     test_name=t_name,
                     bug_type="APP_BUG",
@@ -247,18 +244,15 @@ def failure_analysis(state: AgentState) -> dict:
             "status": "analyzing",
         }
 
-    console.print(f"\n[bold blue]🔍 Failure Analysis Agent[/bold blue] — {FAILURE_ANALYSIS_MODEL}")
+    console.print(f"\n[bold blue]Failure Analysis Agent[/bold blue] — {FAILURE_ANALYSIS_MODEL}")
     console.print(f"   Classifying {len(failures)} failure(s)...")
 
     try:
         classifications = call_llm_with_progress(_classify_failures_batch, failures)
         # Print results nicely
         for classification in classifications:
-            emoji = {"TEST_BUG": "🧪", "APP_BUG": "🐛", "ENV_ISSUE": "⚙️", "FLAKY": "🎲"}.get(
-                classification["bug_type"], "❓"
-            )
             console.print(
-                f"     {emoji} [bold]{classification['bug_type']}[/bold] "
+                f"     [bold]{classification['bug_type']}[/bold] "
                 f"for [cyan]{classification['test_name'][:70]}[/cyan] "
                 f"(confidence: {classification['confidence']}%) — {classification['reasoning'][:80]}"
             )
@@ -269,7 +263,7 @@ def failure_analysis(state: AgentState) -> dict:
     # Aggregate confidence: average of all individual scores
     overall = int(sum(c["confidence"] for c in classifications) / len(classifications)) if classifications else 0
 
-    console.print(f"\n   ✅ Analysis complete. Overall confidence: [bold green]{overall}%[/bold green]")
+    console.print(f"\n   Analysis complete. Overall confidence: [bold green]{overall}%[/bold green]")
 
     return {
         "failure_classifications": classifications,

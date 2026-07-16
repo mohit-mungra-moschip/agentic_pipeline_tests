@@ -84,7 +84,7 @@ def root_cause_commit_analysis(state: AgentState) -> dict:
     failures = state.get("failures", [])
     classifications = state.get("failure_classifications", [])
 
-    console.print("\n[bold magenta]🔬 Root Cause Commit Analysis Agent[/bold magenta]")
+    console.print("\n[bold magenta]Root Cause Commit Analysis Agent[/bold magenta]")
     console.print(f"   Model: {ROOT_CAUSE_MODEL}")
 
     if not failures:
@@ -105,7 +105,7 @@ def root_cause_commit_analysis(state: AgentState) -> dict:
     rel_file_path = primary_failure.get("file_path", "")
 
     # Gather git context
-    console.print("   → Collecting git history...")
+    console.print("   Collecting git history...")
     app_recent_commits = _get_recent_commits(app_git_dir, n=10)
     app_changed_files = _get_changed_files_per_commit(app_git_dir, n=5)
 
@@ -201,7 +201,7 @@ GIT BLAME OUTPUT (failing file):
             confidence=int(parsed.get("confidence", 20)),
         )
         console.print(
-            f"   ✅ Root cause identified: [bold]{result['commit_sha'][:8]}[/bold] "
+            f"   Root cause identified: [bold]{result['commit_sha'][:8]}[/bold] "
             f"by {result['author']} (confidence: {result['confidence']}%)"
         )
         console.print(f"      Analysis: {result['analysis'][:100]}...")

@@ -56,7 +56,7 @@ def action_recommendation_engine(state: AgentState) -> dict:
     failures = state.get("failures", [])
     classifications = state.get("failure_classifications", [])
     root_cause = state.get("root_cause")
-    console.print(f"\n[bold yellow]💡 Action Recommendation Engine[/bold yellow] — {ACTION_RECOMMENDER_MODEL}")
+    console.print(f"\n[bold yellow]Action Recommendation Engine[/bold yellow] — {ACTION_RECOMMENDER_MODEL}")
     cls_map = {c["test_name"]: c for c in classifications}
     recommendations: List[ActionRecommendation] = []
     for failure in failures:
@@ -66,5 +66,5 @@ def action_recommendation_engine(state: AgentState) -> dict:
         colors = {"Critical": "red", "High": "orange1", "Medium": "yellow", "Low": "green"}
         c = colors.get(rec["priority"], "white")
         console.print(f"   [{c}]{rec['priority']}[/{c}] — {rec['summary'][:80]} (~{rec['effort_hours']}h)")
-    console.print(f"   ✅ {len(recommendations)} recommendation(s) generated.")
+    console.print(f"   {len(recommendations)} recommendation(s) generated.")
     return {"action_recommendations": recommendations, "status": "jira_ticketing"}

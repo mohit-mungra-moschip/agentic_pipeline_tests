@@ -75,7 +75,7 @@ class TokenTracker:
         console = Console()
         with self.lock:
             if not self.usage:
-                console.print("\n[yellow]⚠️  No token usage recorded during this run.[/yellow]")
+                console.print("\n[yellow]No token usage recorded during this run.[/yellow]")
                 return
             
             table = Table(title="Token Usage Summary per Node", show_footer=True)
@@ -119,7 +119,7 @@ class TokenTracker:
             console.print("\n")
             console.print(Panel(
                 table,
-                title="[bold green]📊 Token Usage Report[/bold green]",
+                title="[bold green]Token Usage Report[/bold green]",
                 border_style="green",
                 expand=False
             ))

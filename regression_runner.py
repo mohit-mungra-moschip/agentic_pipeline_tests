@@ -73,7 +73,7 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
 
     import signal
     def handle_abort(signum, frame):
-        console.print("\n[bold red]🛑 Pipeline aborted by user / process manager.[/bold red]\n")
+        console.print("\n[bold red]Pipeline aborted by user / process manager.[/bold red]\n")
         _update_active_run_status("Aborted", 100, "aborted", run_id, "Pipeline aborted by signal or user interrupt.", running=False)
         sys.exit(1)
 
@@ -92,10 +92,10 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
         f"[bold]Run ID:[/bold]       {run_id}\n"
         f"[bold]Project:[/bold]      {project_path}\n"
         f"[bold]Test Command:[/bold] {test_command}\n"
-        f"[bold]CI Mode:[/bold]      {'✅ Fully Agentic' if ci_mode else '⏸ Interactive'}\n"
+        f"[bold]CI Mode:[/bold]      {'Fully Agentic' if ci_mode else 'Interactive'}\n"
         f"[bold]Max Iterations:[/bold] {max_iter}\n"
         f"[bold]Create Jira:[/bold]  {should_create_jira}",
-        title="[bold blue]🤖 RegressionAI Pipeline[/bold blue]",
+        title="[bold blue]RegressionAI Pipeline[/bold blue]",
     ))
 
     # Read test output from file (CI writes it) or run fresh
@@ -149,12 +149,12 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
 
     thread = {"configurable": {"thread_id": run_id}}
     try:
-        console.print("\n[bold cyan]🚀 Starting RegressionAI Pipeline...[/bold cyan]\n")
+        console.print("\n[bold cyan]Starting RegressionAI Pipeline...[/bold cyan]\n")
         
         # Stream updates in real-time
         for event in graph.stream(initial_state, thread, stream_mode="updates"):
             for node_name, node_update in event.items():
-                console.print(f"[bold cyan]▶ Node completed: {node_name}[/bold cyan]")
+                console.print(f"[bold cyan]Node completed: {node_name}[/bold cyan]")
                 
                 # Update status based on completed node
                 stage_mapping = {
@@ -222,10 +222,10 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
                 from utils.mailer import send_pipeline_report
                 send_pipeline_report(final, run_id)
             except Exception as mail_exc:
-                console.print(f"  [yellow]⚠️  Mailer skipped: {mail_exc}[/yellow]")
+                console.print(f"  [yellow]Mailer skipped: {mail_exc}[/yellow]")
 
         if final.get("healing_successful") or final.get("test_passed"):
-            console.print("\n[bold green]✅ Pipeline complete — all issues resolved.[/bold green]")
+            console.print("\n[bold green]Pipeline complete — all issues resolved.[/bold green]")
             _update_active_run_status("Completed", 100, "success", run_id, "Pipeline complete — all issues resolved.", running=False)
             sys.exit(0)
         else:
@@ -233,17 +233,17 @@ def main(project_path, test_command, run_id, ci_mode, max_iter, create_jira):
                 f for f in final.get("failures", [])
                 if not final.get("healing_successful")
             ])
-            console.print(f"\n[bold yellow]⚠️  Pipeline complete — {remaining} unhealed failure(s).[/bold yellow]")
+            console.print(f"\n[bold yellow]Pipeline complete — {remaining} unhealed failure(s).[/bold yellow]")
             _update_active_run_status("Completed", 100, "warning", run_id, f"Pipeline complete — {remaining} unhealed failure(s).", running=False)
             sys.exit(0)  # Exit 0 so CI doesn't double-fail; final check job handles this
 
     except KeyboardInterrupt:
-        console.print("\n[bold red]🛑 Pipeline aborted by user (Ctrl+C).[/bold red]\n")
+        console.print("\n[bold red]Pipeline aborted by user (Ctrl+C).[/bold red]\n")
         _update_active_run_status("Aborted", 100, "aborted", run_id, "Pipeline aborted by user (Ctrl+C).", running=False)
         sys.exit(1)
     except Exception as exc:
         import traceback
-        console.print(f"[bold red]❌ Pipeline error: {exc}[/bold red]")
+        console.print(f"[bold red]Pipeline error: {exc}[/bold red]")
         traceback.print_exc()
         _write_summary({}, run_id, error=str(exc))
         _update_active_run_status("Error", 100, "error", run_id, f"Pipeline error: {exc}", running=False)
@@ -463,7 +463,7 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                 html_path.write_text(html_content, encoding="utf-8")
                 console.print(f"  🎨 [bold green]Updated Visual HTML report with Jira link[/bold green] -> {html_path}")
     except Exception as e:
-        console.print(f"  [yellow]⚠️  Could not update HTML report: {e}[/yellow]")
+        console.print(f"  [yellow]Could not update HTML report: {e}[/yellow]")
 
     # 2. Generate Excel Report — prefer healed JSON (full results), fall back to XML
     try:
@@ -501,9 +501,9 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
             excel_file = _generate_excel_report_inline("logs", output_file=str(dest), ai_state=state)
 
         if excel_file and Path(excel_file).exists():
-            console.print(f"  📊 [bold green]Excel Report Generated Successfully[/bold green] -> {dest}")
+            console.print(f"  [bold green]Excel Report Generated Successfully[/bold green] -> {dest}")
         else:
-            console.print("  [yellow]⚠️  Excel report generation returned empty or JSON/XML was not found.[/yellow]")
+            console.print("  [yellow]Excel report generation returned empty or JSON/XML was not found.[/yellow]")
             
         # 3. Upload results to TestRail (if configured)
         if best_json:
@@ -511,9 +511,9 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                 from utils.report_utils.test_rail_sync import sync_results_to_testrail
                 sync_results_to_testrail(str(best_json))
             except Exception as e:
-                console.print(f"  [red]❌ TestRail sync failed: {e}[/red]")
+                console.print(f"  [red]TestRail sync failed: {e}[/red]")
     except Exception as e:
-        console.print(f"  [red]❌ Excel report generation failed: {e}[/red]")
+        console.print(f"  [red]Excel report generation failed: {e}[/red]")
 
 
 if __name__ == "__main__":

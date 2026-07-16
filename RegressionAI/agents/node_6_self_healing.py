@@ -357,7 +357,7 @@ def _call_llm_with_progress(func, *args, **kwargs):
     t.start()
     start = time.time()
     while t.is_alive():
-        sys.stdout.write(f"\r   ⏳ Waiting for LLM self-healing analysis... ({int(time.time()-start)}s elapsed)")
+        sys.stdout.write(f"\r   Waiting for LLM self-healing analysis... ({int(time.time()-start)}s elapsed)")
         sys.stdout.flush()
         time.sleep(1)
     sys.stdout.write("\r" + " " * 60 + "\r")
@@ -390,12 +390,12 @@ def self_healing(state: AgentState) -> dict:
     iteration      = state.get("iteration", 0)
     max_iterations = state.get("max_iterations", 3)
 
-    console.print(f"\n[bold green]🔧 Self-Healing Agent[/bold green] — {SELF_HEALING_MODEL}")
-    console.print(f"   CI Mode: {'✅ Fully Agentic' if ci_mode else '⏸ Human approval required'}")
+    console.print(f"\n[bold green]Self-Healing Agent[/bold green] — {SELF_HEALING_MODEL}")
+    console.print(f"   CI Mode: {'Fully Agentic' if ci_mode else 'Human approval required'}")
     console.print(f"   Iteration: {iteration + 1}/{max_iterations}")
 
     if iteration >= max_iterations:
-        console.print("   ⚠️  Max iterations reached. Self-healing failed.")
+        console.print("   Max iterations reached. Self-healing failed.")
         return {
             "healing_successful": False,
             "status": "root_cause_analysis",
@@ -430,9 +430,9 @@ def self_healing(state: AgentState) -> dict:
     all_env_issues = existing_env_issues + new_env_issues
 
     if env_failures:
-        console.print(f"   ⚠️  {len(env_failures)} ENV_ISSUE failure(s) detected — attempting to auto-heal by adjusting code config...")
+        console.print(f"   {len(env_failures)} ENV_ISSUE failure(s) detected — attempting to auto-heal by adjusting code config...")
         for ef in env_failures:
-            console.print(f"      ⚙️  [cyan]{ef.get('test_name', 'unknown')[:70]}[/cyan]")
+            console.print(f"      [cyan]{ef.get('test_name', 'unknown')[:70]}[/cyan]")
 
     failures = healable_failures
 
@@ -440,27 +440,27 @@ def self_healing(state: AgentState) -> dict:
     flaky_failures = [f for f in failures if cls_map.get(f.get("test_name", ""), {}).get("bug_type") == "FLAKY"]
 
     if flaky_failures:
-        console.print(f"   🎲 Detected {len(flaky_failures)} FLAKY failure(s). Retrying them...")
+        console.print(f"   Detected {len(flaky_failures)} FLAKY failure(s). Retrying them...")
         still_failing = []
         for f in flaky_failures:
             test_name = f.get("test_name", "unknown")
             passed    = False
             for attempt in range(3):
-                console.print(f"      → Retrying {test_name[:60]}... (attempt {attempt+1}/3)")
+                console.print(f"      Retrying {test_name[:60]}... (attempt {attempt+1}/3)")
                 passed, _ = _run_failed_tests(project_path, test_command, [f], use_test_name=True)
                 if passed:
-                    console.print(f"      ✅ Test passed on attempt {attempt+1}!")
+                    console.print(f"      Test passed on attempt {attempt+1}!")
                     break
                 time.sleep(1)
             if not passed:
-                console.print(f"      ❌ Consistently failing after 3 attempts.")
+                console.print(f"      Consistently failing after 3 attempts.")
                 still_failing.append(f)
 
         non_flaky = [f for f in failures if cls_map.get(f.get("test_name", ""), {}).get("bug_type") != "FLAKY"]
         failures  = non_flaky + still_failing
 
         if not failures:
-            console.print("   ✅ All flaky failures resolved via retry!")
+            console.print("   All flaky failures resolved via retry!")
             return {
                 "healing_successful": True,
                 "healed_test_output": "All flaky failures resolved via retry",
@@ -483,13 +483,13 @@ def self_healing(state: AgentState) -> dict:
     if has_app_bug:
         intended_healing_type = "APP_HEAL"
         model_to_use = os.getenv("ADVANCED_HEALING_MODEL", "groq/llama-3.3-70b-versatile").strip()
-        console.print(f"   🚀 [bold magenta]Escalating to advanced model: {model_to_use}[/bold magenta] (APP_BUG detected)")
+        console.print(f"   [bold magenta]Escalating to advanced model: {model_to_use}[/bold magenta] (APP_BUG detected)")
     else:
         intended_healing_type = "TEST_HEAL"
         model_to_use = SELF_HEALING_MODEL
-        console.print(f"   🤖 Using model: {model_to_use} (no APP_BUG detected)")
+        console.print(f"   Using model: {model_to_use} (no APP_BUG detected)")
 
-    console.print(f"   📌 Intended healing type: [bold yellow]{intended_healing_type}[/bold yellow]")
+    console.print(f"   Intended healing type: [bold yellow]{intended_healing_type}[/bold yellow]")
 
     # ── Step 4: Internal Try-Verify-Adjust Sandbox Loop ──────────────────────
     internal_max_attempts = 3
@@ -525,7 +525,7 @@ def self_healing(state: AgentState) -> dict:
 - CRITICAL: An environment/infrastructure issue (ENV_ISSUE) has been detected (e.g., broken connection strings, nonexistent hosts, database timeouts). Prioritize correcting database URLs, API hostnames, port configurations, or credentials in the test files to point back to stable local/in-memory endpoints (like 'sqlite+aiosqlite:///./test_tasks.db' or local mock services)."""
 
     while internal_attempt < internal_max_attempts:
-        console.print(f"\n   🔄 [bold blue]Sandbox Loop: Internal Attempt {internal_attempt + 1}/{internal_max_attempts}[/bold blue]")
+        console.print(f"\n   [bold blue]Sandbox Loop: Internal Attempt {internal_attempt + 1}/{internal_max_attempts}[/bold blue]")
 
         # Re-read files to ensure we have current clean workspace content
         files_context = ""
@@ -625,7 +625,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
             raw = None
             fixes_raw = None
             try:
-                console.print(f"   🤖 Calling model: {model_candidate}...")
+                console.print(f"   Calling model: {model_candidate}...")
                 ai = AIWrapper(LLMConfig(model=model_candidate, temperature=0.1), mode="llm")
                 raw = _call_llm_with_progress(ai.run, prompt, system_prompt=SYSTEM_PROMPT)
                 raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
@@ -642,10 +642,10 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                         fixes_raw = repair_json(raw, return_objects=True)
                 
                 if not isinstance(fixes_raw, list) or not fixes_raw:
-                    console.print(f"   ⚠️  No valid fixes generated by {model_candidate}.")
+                    console.print(f"   No valid fixes generated by {model_candidate}.")
                     continue
             except Exception as model_exc:
-                console.print(f"   ⚠️  Model {model_candidate} failed: {model_exc}")
+                console.print(f"   Model {model_candidate} failed: {model_exc}")
                 continue
 
             # Auto-correct file paths if LLM specifies wrong path but unique target_content match is found
@@ -683,7 +683,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                                 except Exception:
                                     pass
                         if found_path:
-                            console.print(f"   ℹ️  Auto-correcting wrong LLM file path from '{file_path}' to '{found_path}' (target_content matches)")
+                            console.print(f"   Auto-correcting wrong LLM file path from '{file_path}' to '{found_path}' (target_content matches)")
                             fix["file_path"] = found_path
 
             # Keep backups of files we are going to modify
@@ -720,7 +720,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                             import py_compile
                             py_compile.compile(str(full_path), doraise=True)
                         except py_compile.PyCompileError as err:
-                            console.print(f"   ❌ Syntax error detected in healed file {file_path}:\n{err.msg}")
+                            console.print(f"   Syntax error detected in healed file {file_path}:\n{err.msg}")
                             apply_failed = True
                             apply_error_msg = f"Syntax error in {file_path} after applying fix:\n{err.msg}"
                             break
@@ -757,7 +757,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                         full_p.write_text(content, encoding="utf-8")
 
                 err_msg = apply_error_msg or "No fixes applied."
-                console.print(f"   ❌ Candidate fix application failed: {err_msg}")
+                console.print(f"   Candidate fix application failed: {err_msg}")
                 internal_failures_history.append(f"Model {model_candidate} fix application failed: {err_msg}")
                 continue
 
@@ -779,7 +779,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
             dep_files = {"requirements.txt", "pyproject.toml", "setup.py"}
             modified_dep_files = {Path(fix.get("file_path", "")).name for fix in current_attempt_proposed}
             if dep_files.intersection(modified_dep_files):
-                console.print("   📦 [cyan]Detected dependency configuration change — installing packages in sandbox...[/cyan]")
+                console.print("   [cyan]Detected dependency configuration change — installing packages in sandbox...[/cyan]")
                 venv_activate = os.path.join(project_path, ".venv", "bin", "activate")
                 if os.path.exists(venv_activate):
                     install_cmds = []
@@ -812,17 +812,17 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                         executable=install_exec
                     )
                     if res.returncode == 0:
-                        console.print("   ✅ [green]Dependency installation successful![/green]")
+                        console.print("   [green]Dependency installation successful![/green]")
                     else:
-                        console.print(f"   ❌ [red]Dependency installation failed: {res.stdout + res.stderr}[/red]")
+                        console.print(f"   [red]Dependency installation failed: {res.stdout + res.stderr}[/red]")
                 except Exception as inst_err:
-                    console.print(f"   ❌ [red]Failed to run package installation: {inst_err}[/red]")
+                    console.print(f"   [red]Failed to run package installation: {inst_err}[/red]")
 
             # Re-run tests in sandbox
             passed = False
             test_output = ""
             if candidate_healing_type == "APP_HEAL":
-                console.print("   🔄 APP_HEAL candidate — running FULL test suite in sandbox to verify no regressions...")
+                console.print("   APP_HEAL candidate — running FULL test suite in sandbox to verify no regressions...")
                 xml_path = os.path.join(project_path, "logs/test-results.xml")
                 original_xml_content = None
                 if os.path.exists(xml_path):
@@ -844,7 +844,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                     log.info(f"Self-healing verification: original={original_failed_names}, targeted={targeted_names}, rerun={rerun_failed_names}")
                     
                     if targeted_names and not targeted_names.intersection(rerun_failed_names) and not (rerun_failed_names - original_failed_names):
-                        console.print("   ✅ Targeted failures resolved, and no new regressions detected. Verification PASSED.")
+                        console.print("   Targeted failures resolved, and no new regressions detected. Verification PASSED.")
                         passed = True
                     else:
                         passed = False
@@ -855,7 +855,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                             except Exception as xml_err:
                                 log.warning(f"Could not restore backup xml file: {xml_err}")
             else:
-                console.print("   🔄 TEST_HEAL candidate — running failed tests in sandbox...")
+                console.print("   TEST_HEAL candidate — running failed tests in sandbox...")
                 passed, test_output = _run_failed_tests(project_path, test_command, failures)
 
             if passed:
@@ -873,7 +873,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                             cwd=project_path, capture_output=True, text=True,
                         )
                         if diff_res.stdout.strip():
-                            console.print("\n[bold yellow]   ⚡ Git Diff of Applied Fix:[/bold yellow]")
+                            console.print("\n[bold yellow]   Git Diff of Applied Fix:[/bold yellow]")
                             console.print(Syntax(diff_res.stdout, "diff", theme="monokai", line_numbers=True))
                             console.print("[bold yellow]   ---------------------------------------[/bold yellow]\n")
                     except Exception as e:
@@ -892,7 +892,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                     else:
                         full_p.write_text(content, encoding="utf-8")
 
-                console.print(f"   ❌ Candidate fix failed verification tests.")
+                console.print(f"   Candidate fix failed verification tests.")
                 internal_failures_history.append(
                     f"Model {model_candidate} (Attempt #{internal_attempt+1}) code changes failed verification. Output:\n{test_output[:1000]}"
                 )
@@ -904,8 +904,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
             internal_attempt += 1
 
     if healing_successful:
-        emoji = "🐛" if final_healing_type == "APP_HEAL" else "🧪"
-        console.print(f"   ✅ [bold green]{emoji} All tests PASS! Self-healing ({final_healing_type}) successful after {internal_attempt + 1} attempts.[/bold green]")
+        console.print(f"   [bold green]All tests PASS! Self-healing ({final_healing_type}) successful after {internal_attempt + 1} attempts.[/bold green]")
         
         # Filter out successfully healed env issues from the returned env_issues list
         healed_test_names = {f.get("test_name") for f in failures}
@@ -923,7 +922,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
             "env_issues":         remaining_env_issues,
         }
     else:
-        console.print(f"   ❌ All {internal_max_attempts} internal self-healing attempts failed.")
+        console.print(f"   All {internal_max_attempts} internal self-healing attempts failed.")
         return {
             "healing_successful": False,
             "healed_test_output": final_test_output or "All internal healing attempts failed verification",

@@ -139,9 +139,9 @@ def _build_html(state: dict, run_id: str) -> str:
     
     # Release Status
     if failed_tests > 0:
-        release_status = 'Blocker <span style="color:#dc2626;">🔴</span>'
+        release_status = '<span style="color:#dc2626; font-weight:bold;">BLOCKER</span>'
     else:
-        release_status = 'Passed <span style="color:#16a34a;">🟢</span>'
+        release_status = '<span style="color:#16a34a; font-weight:bold;">PASSED</span>'
 
     # Styles
     fail_style = 'color: #dc2626; font-weight: bold; background-color: #fee2e2;' if failed_tests > 0 else 'color: #475569;'
@@ -468,11 +468,11 @@ def send_pipeline_report(state: dict, run_id: str) -> None:
     healed_tests = sum(1 for r in results if r.get("status") in ("PASS", "PASSED") and (r.get("pr_url") or r.get("jira_id")))
 
     if failed_tests > 0:
-        tag = f"❌ {failed_tests} FAILURE(S)"
+        tag = f"{failed_tests} FAILURE(S)"
     elif healed_tests > 0:
-        tag = "✅ ALL HEALED"
+        tag = "ALL HEALED"
     else:
-        tag = "✅ ALL PASSED"
+        tag = "ALL PASSED"
 
     subject   = f"Agentic Solution - Test Execution Report ({tag})"
     html_body = _build_html(state, run_id)
@@ -488,6 +488,6 @@ def send_pipeline_report(state: dict, run_id: str) -> None:
             server.starttls()
             server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
             server.sendmail(SENDER_EMAIL, RECEIVER_EMAILS, msg.as_string())
-        print(f"📧 Pipeline report email sent → {', '.join(RECEIVER_EMAILS)}")
+        print(f"Pipeline report email sent -> {', '.join(RECEIVER_EMAILS)}")
     except Exception as exc:
-        print(f"⚠️  Email send failed (non-critical): {exc}")
+        print(f"Email send failed (non-critical): {exc}")

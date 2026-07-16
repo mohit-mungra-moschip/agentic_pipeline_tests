@@ -80,7 +80,7 @@ def _require_env(key: str) -> str:
     value = os.getenv(key, "").strip()
     if not value:
         raise EnvironmentError(
-            f"\n\n  ❌  {key} is not set in your .env file.\n"
+            f"\n\n  Error: {key} is not set in your .env file.\n"
             f"      Open .env and add:  {key} = <value>\n"
         )
     return value
@@ -319,27 +319,27 @@ class RotatingLLM:
                     in_t, out_t = extract_tokens(result, messages)
                     token_tracker.record_usage(self._model, in_t, out_t)
                 except Exception as tracker_exc:
-                    console.print(f"[dim yellow]⚠️  Token tracking error: {tracker_exc}[/dim yellow]")
+                    console.print(f"[dim yellow]Token tracking error: {tracker_exc}[/dim yellow]")
                 
                 return result
             except Exception as exc:
                 if _is_rate_limit_error(exc):
                     console.print(
-                        f"[yellow]⚠  {self._model} {self._labels[idx]} "
+                        f"[yellow]{self._model} {self._labels[idx]} "
                         f"rate-limited — trying next key…[/yellow]"
                     )
                     errors.append(f"{self._labels[idx]}: {str(exc)[:100]}")
                     continue
                 if _is_tool_call_failed_error(exc):
                     console.print(
-                        f"[yellow]⚠  {self._model} {self._labels[idx]} "
+                        f"[yellow]{self._model} {self._labels[idx]} "
                         f"tool-call format error — rotating to next key…[/yellow]"
                     )
                     errors.append(f"{self._labels[idx]}: tool_use_failed")
                     continue
                 if _is_openrouter_loop_error(exc):
                     console.print(
-                        f"[yellow]⚠  {self._model} {self._labels[idx]} "
+                        f"[yellow]{self._model} {self._labels[idx]} "
                         f"OpenRouter loop-detection triggered — retrying with bypass tag…[/yellow]"
                     )
                     try:
@@ -353,7 +353,7 @@ class RotatingLLM:
                             in_t, out_t = extract_tokens(result, patched)
                             token_tracker.record_usage(self._model, in_t, out_t)
                         except Exception as tracker_exc:
-                            console.print(f"[dim yellow]⚠️  Token tracking error: {tracker_exc}[/dim yellow]")
+                            console.print(f"[dim yellow]Token tracking error: {tracker_exc}[/dim yellow]")
                             
                         return result
                     except Exception as inner_exc:
@@ -363,15 +363,15 @@ class RotatingLLM:
                 # Non-rotatable error (like 413 request too large, or other exceptions)
                 if self.fallback_llm:
                     console.print(
-                        f"[bold yellow]⚠️  Model '{self._model}' failed with non-rotatable error: {exc}. "
+                        f"[bold yellow]Model '{self._model}' failed with non-rotatable error: {exc}. "
                         f"Falling back to model '{self.fallback_llm._model}'...[/bold yellow]"
                     )
                     return self.fallback_llm.invoke(messages, **kwargs)
                 raise
-
+ 
         if self.fallback_llm:
             console.print(
-                f"[bold yellow]⚠️  All keys for '{self._model}' failed. "
+                f"[bold yellow]All keys for '{self._model}' failed. "
                 f"Falling back to model '{self.fallback_llm._model}'...[/bold yellow]"
             )
             return self.fallback_llm.invoke(messages, **kwargs)
@@ -398,35 +398,24 @@ class RotatingLLM:
                     yield chunk
                 
                 self._idx = idx           # remember the working key
-                
-                # Record token usage
-                try:
-                    from common_utils.token_tracker import token_tracker, extract_tokens
-                    full_content = "".join(accumulated_content)
-                    in_t, out_t = extract_tokens(last_chunk or full_content, messages)
-                    token_tracker.record_usage(self._model, in_t, out_t)
-                except Exception as tracker_exc:
-                    pass
-                
-                return
-            except Exception as exc:
+                            except Exception as exc:
                 if _is_rate_limit_error(exc):
                     console.print(
-                        f"\n[yellow]⚠  {self._model} {self._labels[idx]} "
+                        f"\n[yellow]{self._model} {self._labels[idx]} "
                         f"rate-limited — trying next key…[/yellow]"
                     )
                     errors.append(f"{self._labels[idx]}: {str(exc)[:100]}")
                     continue
                 if _is_tool_call_failed_error(exc):
                     console.print(
-                        f"\n[yellow]⚠  {self._model} {self._labels[idx]} "
+                        f"\n[yellow]{self._model} {self._labels[idx]} "
                         f"tool-call format error — rotating to next key…[/yellow]"
                     )
                     errors.append(f"{self._labels[idx]}: tool_use_failed")
                     continue
                 if _is_openrouter_loop_error(exc):
                     console.print(
-                        f"\n[yellow]⚠  {self._model} {self._labels[idx]} "
+                        f"\n[yellow]{self._model} {self._labels[idx]} "
                         f"OpenRouter loop-detection triggered — retrying stream with bypass tag…[/yellow]"
                     )
                     try:
@@ -459,8 +448,20 @@ class RotatingLLM:
                 # Non-rotatable error
                 if self.fallback_llm:
                     console.print(
-                        f"\n[bold yellow]⚠️  Model '{self._model}' failed with non-rotatable error: {exc}. "
+                        f"\n[bold yellow]Model '{self._model}' failed with non-rotatable error: {exc}. "
                         f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
+                    )
+                    yield from self.fallback_llm.stream(messages, **kwargs)
+                    return
+                raise
+ 
+        if self.fallback_llm:
+            console.print(
+                f"\n[bold yellow]All keys for '{self._model}' failed. "
+                f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
+            )
+            yield from self.fallback_llm.stream(messages, **kwargs)
+            returnk_llm._model}'...[/bold yellow]"
                     )
                     yield from self.fallback_llm.stream(messages, **kwargs)
                     return
@@ -481,7 +482,7 @@ class RotatingLLM:
         n = len(self._llms)
         lines = "\n".join(f"    {e}" for e in errors)
         return (
-            f"\n\n  ❌  All {n} API key(s) for '{self._model}' are exhausted "
+            f"\n\n  Error: All {n} API key(s) for '{self._model}' are exhausted "
             f"(rate-limited / quota exceeded).\n"
             f"  Add more keys to your .env (comma-separated) or wait for quota reset.\n"
             f"  Errors:\n{lines}\n"
@@ -523,7 +524,7 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
             fallback_kwargs = dict(kwargs)
             fallback_llm = get_llm(fallback_model, temperature=temperature, is_fallback=True, **fallback_kwargs)
         except Exception as fallback_exc:
-            console.print(f"[dim yellow]⚠️  Failed to load fallback model '{fallback_model}': {fallback_exc}[/dim yellow]")
+            console.print(f"[dim yellow]Failed to load fallback model '{fallback_model}': {fallback_exc}[/dim yellow]")
 
     provider   = _detect_provider(model)
     bare_model = _strip_provider_prefix(model)   # strip 'groq/', 'ollama/', etc.
@@ -535,7 +536,7 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
     # ── Ollama: no API key needed ──────────────────────────────────────────────
     if provider == "ollama":
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-        console.print(f"[dim]🖥  Ollama  [{bare_model}]  {base_url}[/dim]")
+        console.print(f"[dim]Ollama  [{bare_model}]  {base_url}[/dim]")
         llm = _make_single_llm("ollama", bare_model, "", temperature,
                                base_url=base_url, **kwargs)
         return RotatingLLM([llm], ["local"], bare_model, fallback_llm=fallback_llm)
@@ -564,7 +565,7 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
     keys = _parse_keys(raw_keys)
     if not keys:
         raise EnvironmentError(
-            f"\n\n  ❌  {key_env} is set but contains no valid keys.\n"
+            f"\n\n  Error: {key_env} is set but contains no valid keys.\n"
             f"      Use a comma-separated list: {key_env} = key1, key2\n"
         )
 
@@ -574,7 +575,7 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
 
     if len(keys) > 1:
         console.print(
-            f"[dim]🔑 {bare_model}: {len(keys)} API keys loaded — "
+            f"[dim]{bare_model}: {len(keys)} API keys loaded — "
             f"will rotate on rate-limit errors[/dim]"
         )
 

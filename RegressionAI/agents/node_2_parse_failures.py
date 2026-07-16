@@ -58,7 +58,7 @@ def parse_failures(state: AgentState) -> dict:
     from pathlib import Path
     import xml.etree.ElementTree as ET
 
-    console.print(f"\n[bold blue]📋 Parse Failures[/bold blue] — JUnit XML & {FAILURE_PARSER_MODEL}")
+    console.print(f"\n[bold blue]Parse Failures[/bold blue] — JUnit XML & {FAILURE_PARSER_MODEL}")
 
     # 1. Try to parse from JUnit XML for 100% accuracy and 0 token cost
     xml_path = Path(project_path) / "logs/test-results.xml"
@@ -117,7 +117,7 @@ def parse_failures(state: AgentState) -> dict:
                         "traceback": traceback_text,
                     })
             if xml_failures:
-                console.print(f"   ✅ Parsed {len(xml_failures)} failure(s) from JUnit XML")
+                console.print(f"   Parsed {len(xml_failures)} failure(s) from JUnit XML")
                 return {"failures": xml_failures, "status": "analyzing"}
         except Exception as exc:
             log.warning(f"Failed to parse JUnit XML: {exc}")
@@ -149,12 +149,12 @@ def parse_failures(state: AgentState) -> dict:
             normalized_failures.append(failures)
 
         if normalized_failures:
-            console.print(f"   ✅ Parsed {len(normalized_failures)} failure(s) via LLM")
+            console.print(f"   Parsed {len(normalized_failures)} failure(s) via LLM")
             return {"failures": normalized_failures, "status": "analyzing"}
     except Exception as exc:
         log.warning(f"LLM parse failed: {exc}")
 
     # 3. Regex Fallback
     failures = _regex_fallback(output)
-    console.print(f"   ⚠️  Regex fallback: {len(failures)} failure(s)")
+    console.print(f"   Regex fallback: {len(failures)} failure(s)")
     return {"failures": failures, "status": "analyzing"}

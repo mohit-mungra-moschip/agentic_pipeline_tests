@@ -17,7 +17,7 @@ def run_tests(state: AgentState) -> dict:
     project_path = state.get("project_path", ".")
     test_command = state.get("test_command", "pytest")
 
-    console.print(f"\n[bold blue]🧪 Test Runner[/bold blue]")
+    console.print(f"\n[bold blue]Test Runner[/bold blue]")
     console.print(f"   Command: [cyan]{test_command}[/cyan]")
     console.print(f"   Path: {project_path}")
 
@@ -44,13 +44,13 @@ def run_tests(state: AgentState) -> dict:
         passed = result.returncode == 0
 
         if passed:
-            console.print("   ✅ [green]All tests PASSED[/green]")
+            console.print("   [green]All tests PASSED[/green]")
         else:
             lines = output.splitlines()
             # Find summary line
             for line in reversed(lines):
                 if "passed" in line or "failed" in line or "error" in line:
-                    console.print(f"   ❌ [red]{line.strip()}[/red]")
+                    console.print(f"   [red]{line.strip()}[/red]")
                     break
 
         return {

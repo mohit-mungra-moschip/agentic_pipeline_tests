@@ -150,8 +150,8 @@ def _create_failure_ticket(
         jira_priority = {"Critical": "Highest", "High": "High", "Medium": "Medium", "Low": "Low"}.get(priority, "Medium")
 
         # Differentiate healed vs unhealed in the title and description
-        healed_badge  = "✅ AI-Healed" if heal_status == "healed" else "❌ Unhealed"
-        issue_summary = f"[RegressionAI] {healed_badge} | {test_name[:80]} — {bug_type}"
+        healed_badge  = "AI-Healed" if heal_status == "healed" else "Unhealed"
+        issue_summary = f"[RegressionAI] {bug_type} {healed_badge} | {test_name[:80]}"
 
         repo = os.getenv("GITHUB_REPOSITORY", "mohit-mungra-moschip/agentic_pipeline")
         server_url = os.getenv("GITHUB_SERVER_URL", "https://github.com")
@@ -206,7 +206,7 @@ def _create_failure_ticket(
         _add_to_sprint(jira, issue.key)
 
         jira_url = f"{JIRA_SERVER}/browse/{issue.key}"
-        console.print(f"   🎫 [{heal_status}] Jira ticket: [link={jira_url}]{issue.key}[/link]")
+        console.print(f"   [{heal_status}] Jira ticket: [link={jira_url}]{issue.key}[/link]")
         return JiraResult(
             test_name=test_name, jira_id=issue.key, jira_url=jira_url,
             status="created", bug_type=bug_type, heal_status=heal_status,
@@ -260,7 +260,7 @@ def _create_env_ticket(
         _add_to_sprint(jira, issue.key)
 
         jira_url = f"{JIRA_SERVER}/browse/{issue.key}"
-        console.print(f"   ⚙️  ENV ticket: [link={jira_url}]{issue.key}[/link]")
+        console.print(f"   ENV ticket: [link={jira_url}]{issue.key}[/link]")
         return JiraResult(
             test_name=test_name, jira_id=issue.key, jira_url=jira_url,
             status="created", bug_type="ENV_ISSUE", heal_status="env_tracked",
@@ -293,7 +293,7 @@ def jira_ticketing(state: AgentState) -> dict:
     approved_fixes    = state.get("approved_fixes", [])
     env_issues        = state.get("env_issues") or []
 
-    console.print(f"\n[bold cyan]🎫 Jira Ticketing Agent[/bold cyan]")
+    console.print(f"\n[bold cyan]Jira Ticketing Agent[/bold cyan]")
     console.print(f"   Healing: {healing_type} | Healed: {healing_successful}")
 
     if not create_jira:
@@ -352,7 +352,7 @@ def jira_ticketing(state: AgentState) -> dict:
 
     # ── Tickets for ENV_ISSUE failures ──
     if env_issues:
-        console.print(f"\n   ⚙️  Creating {len(env_issues)} ENV_ISSUE ticket(s)...")
+        console.print(f"\n   Creating {len(env_issues)} ENV_ISSUE ticket(s)...")
     for env_issue in env_issues:
         result = _create_env_ticket(env_issue, run_id=run_id, assignee_email=target_email)
         results_unhealed.append(result)
@@ -361,7 +361,7 @@ def jira_ticketing(state: AgentState) -> dict:
     created_unhealed = sum(1 for r in results_unhealed if r["status"] == "created")
     created_healed   = sum(1 for r in results_healed   if r["status"] == "created")
     console.print(
-        f"\n   ✅ Jira done: [bold green]{created_healed}[/bold green] healed ticket(s), "
+        f"\n   Jira done: [bold green]{created_healed}[/bold green] healed ticket(s), "
         f"[bold red]{created_unhealed}[/bold red] unhealed/env ticket(s)."
     )
     return {
