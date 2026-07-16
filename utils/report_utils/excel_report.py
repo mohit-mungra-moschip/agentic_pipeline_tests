@@ -1313,7 +1313,6 @@ def generate_excel_from_json(json_path, output_file, ai_state=None):
 
     try:
         _create_excel_report(results, str(output_file))
-        print(f"[excel_from_json] Excel generated → {output_file}")
         return str(output_file)
     except Exception as e:
         print(f"[excel_from_json] _create_excel_report failed: {e}")

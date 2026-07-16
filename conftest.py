@@ -103,11 +103,9 @@ def write_ui_dashboard_reports(ui_results: list[dict], session_start_time: float
     }
 
     json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\n  JSON saved  → {json_path}")
 
     html_content = _build_html(payload, json_path.name)
     html_path.write_text(html_content, encoding="utf-8")
-    print(f"  Visual HTML → {html_path}")
 
 
 def _build_html(payload: dict, json_filename: str) -> str:
@@ -475,7 +473,7 @@ def _build_html(payload: dict, json_filename: str) -> str:
         const trimmedUrl = url.trim();
         if (!trimmedUrl) return;
         let prText = 'PR Link';
-        let prUrlClean = trimmedUrl.replace(/\/+$/, "");
+        let prUrlClean = trimmedUrl.replace(/\\/+$/, "");
         if (prUrlClean.includes('/pull/')) {{
           const parts = prUrlClean.split('/');
           const prNum = parts[parts.length - 1];
