@@ -335,6 +335,93 @@ def _print_final_summary(state: dict, run_id: str):
     
     total, passed, failed, healed_count, skipped, duration = _get_test_counts(run_id, state)
     
+    # ── Render Execution Trace Tree ───────────────────────────────────────────
+    from rich.tree import Tree
+    
+    trace_tree = Tree("[bold cyan]Pipeline Execution Trace[/bold cyan]")
+    
+    # 1. Initial Test Run
+    init_run_branch = trace_tree.add("📁 [bold]Initial Test Execution[/bold]")
+    init_run_branch.add(f"Command: [dim]pytest test_framework/tests/[/dim]")
+    
+    classifications = state.get("failure_classifications", [])
+    if classifications:
+        init_run_branch.add(f"Outcome: [bold red]🔴 Failures detected ({len(classifications)} failing test case(s))[/bold red]")
+    else:
+        init_run_branch.add(f"Outcome: [bold green]🟢 All tests passed[/bold green]")
+        
+    # 2. Failure Analysis
+    if classifications:
+        analysis_branch = trace_tree.add("🔍 [bold]Failure Analysis[/bold]")
+        for c in classifications:
+            test_name = c.get("test_name", "unknown")
+            test_name_short = test_name.replace("test_framework/tests/", "")
+            bug_type = c.get("bug_type", "APP_BUG")
+            conf = c.get("confidence", 0)
+            reason = c.get("reasoning", "")
+            
+            if len(reason) > 80:
+                reason = reason[:77] + "..."
+                
+            bug_color = "red" if bug_type == "APP_BUG" else "yellow" if bug_type == "TEST_BUG" else "magenta"
+            analysis_branch.add(
+                f"[{bug_color}]{bug_type}[/{bug_color}] for [cyan]{test_name_short}[/cyan] "
+                f"({conf}% conf) — {reason}"
+            )
+            
+    # 3. Self-Healing
+    approved_fixes = state.get("approved_fixes", [])
+    healing_successful = state.get("healing_successful", False)
+    healing_type = state.get("healing_type", "NONE")
+    
+    if approved_fixes or healing_successful or (healing_type and healing_type != "NONE"):
+        healing_branch = trace_tree.add(f"🔧 [bold]Self-Healing ({healing_type})[/bold]")
+        if approved_fixes:
+            for fix in approved_fixes:
+                fpath = fix.get("file_path", "")
+                fpath_short = fpath.replace("test_framework/tests/", "")
+                explanation = fix.get("explanation", "")
+                if len(explanation) > 80:
+                    explanation = explanation[:77] + "..."
+                
+                fix_node = healing_branch.add(f"Healed [cyan]{fpath_short}[/cyan]")
+                if explanation:
+                    fix_node.add(f"Explanation: [dim]{explanation}[/dim]")
+        else:
+            healing_branch.add("[bold red]No successful fixes applied[/bold red]")
+            
+    # 4. Final Verification
+    if classifications:
+        verify_branch = trace_tree.add("🔄 [bold]Final Verification[/bold]")
+        if healing_successful or test_passed:
+            verify_branch.add(f"Outcome: [bold green]🟢 {passed} passed[/bold green] (100% success)")
+        else:
+            verify_branch.add(f"Outcome: [bold red]🔴 {failed} failed[/bold red]")
+            
+    # 5. Integrations
+    jira_results = state.get("jira_results", [])
+    jira_healed = state.get("jira_results_healed", [])
+    pr_links = state.get("pr_links", [])
+    
+    if jira_results or jira_healed or pr_links:
+        int_branch = trace_tree.add("🎟️ [bold]Integrations & Sync[/bold]")
+        for j in jira_healed:
+            jid = j.get("jira_id")
+            tname = j.get("test_name", "")
+            tname_short = tname.replace("test_framework/tests/", "")
+            int_branch.add(f"🎫 [green]{jid}[/green] (Transitioned to IN REVIEW - Healed) for [cyan]{tname_short}[/cyan]")
+        for j in jira_results:
+            jid = j.get("jira_id")
+            tname = j.get("test_name", "")
+            tname_short = tname.replace("test_framework/tests/", "")
+            int_branch.add(f"🎫 [red]{jid}[/red] (Created/Transitioned - Open) for [cyan]{tname_short}[/cyan]")
+        for pr in pr_links:
+            int_branch.add(f"🔗 Pull Request: [underline cyan]{pr}[/underline cyan]")
+
+    console.print()
+    console.print(trace_tree)
+    console.print()
+    
     # Format a pytest-like final summary line
     parts = []
     if failed > 0:
