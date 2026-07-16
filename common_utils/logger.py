@@ -90,20 +90,19 @@ def _fmt_kv(kwargs: dict[str, Any]) -> str:
 # ── Logger class ──────────────────────────────────────────────────────────────
 
 class _Logger:
-    def _emit(self, level: str, msg: str, file_only: bool = False, **kwargs: Any) -> None:
+    def _emit(self, level: str, msg: str, **kwargs: Any) -> None:
         colour, icon = _LEVELS[level]
         ts = datetime.now().strftime("%H:%M:%S")
 
         # Terminal line
-        if not file_only:
-            line = Text.assemble(
-                (f"{ts} ", "dim"),
-                (f"{icon} ", colour),
-                (msg, colour if level in ("step", "success", "error") else "white"),
-            )
-            if kwargs:
-                line.append("  " + "  ".join(f"{k}={v}" for k, v in kwargs.items()), style="dim")
-            _console.print(line)
+        line = Text.assemble(
+            (f"{ts} ", "dim"),
+            (f"{icon} ", colour),
+            (msg, colour if level in ("step", "success", "error") else "white"),
+        )
+        if kwargs:
+            line.append("  " + "  ".join(f"{k}={v}" for k, v in kwargs.items()), style="dim")
+        _console.print(line)
 
         # File line (plain)
         kv_str = "  ".join(f"{k}={v}" for k, v in kwargs.items())
@@ -114,13 +113,13 @@ class _Logger:
             f"[{level.upper():<7}] {msg}  {kv_str}".rstrip()
         )
 
-    def step(self, msg: str, file_only: bool = False, **kw):    self._emit("step",    msg, file_only=file_only, **kw)
-    def info(self, msg: str, file_only: bool = False, **kw):    self._emit("info",    msg, file_only=file_only, **kw)
-    def success(self, msg: str, file_only: bool = False, **kw): self._emit("success", msg, file_only=file_only, **kw)
-    def llm(self, msg: str, file_only: bool = False, **kw):     self._emit("llm",     msg, file_only=file_only, **kw)
-    def warn(self, msg: str, file_only: bool = False, **kw):    self._emit("warn",    msg, file_only=file_only, **kw)
-    def warning(self, msg: str, file_only: bool = False, **kw): self._emit("warn",    msg, file_only=file_only, **kw)
-    def error(self, msg: str, file_only: bool = False, **kw):   self._emit("error",   msg, file_only=file_only, **kw)
+    def step(self, msg: str, **kw):    self._emit("step",    msg, **kw)
+    def info(self, msg: str, **kw):    self._emit("info",    msg, **kw)
+    def success(self, msg: str, **kw): self._emit("success", msg, **kw)
+    def llm(self, msg: str, **kw):     self._emit("llm",     msg, **kw)
+    def warn(self, msg: str, **kw):    self._emit("warn",    msg, **kw)
+    def warning(self, msg: str, **kw): self._emit("warn",    msg, **kw)
+    def error(self, msg: str, **kw):   self._emit("error",   msg, **kw)
 
     def separator(self, title: str = "") -> None:
         _console.rule(f"[dim]{title}[/dim]" if title else "")

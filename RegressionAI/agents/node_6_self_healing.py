@@ -609,7 +609,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
                 ai = AIWrapper(LLMConfig(model=model_candidate, temperature=0.1), mode="llm")
                 raw = _call_llm_with_progress(ai.run, prompt, system_prompt=SYSTEM_PROMPT)
                 raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
-                log.info(f"Self-healing raw LLM response ({model_candidate}): {raw}", file_only=True)
+                log.info(f"Self-healing raw LLM response ({model_candidate}): {raw}")
                 
                 try:
                     # Sanitize raw JSON first to escape unescaped double-quotes in Python code strings

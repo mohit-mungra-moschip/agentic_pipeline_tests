@@ -322,17 +322,25 @@ class RotatingLLM:
                 
                 return result
             except Exception as exc:
-                from common_utils.logger import log
                 if _is_rate_limit_error(exc):
-                    log.warn(f"{self._model} {self._labels[idx]} rate-limited — trying next key…")
+                    console.print(
+                        f"[yellow]{self._model} {self._labels[idx]} "
+                        f"rate-limited — trying next key…[/yellow]"
+                    )
                     errors.append(f"{self._labels[idx]}: {str(exc)[:100]}")
                     continue
                 if _is_tool_call_failed_error(exc):
-                    log.warn(f"{self._model} {self._labels[idx]} tool-call format error — rotating to next key…")
+                    console.print(
+                        f"[yellow]{self._model} {self._labels[idx]} "
+                        f"tool-call format error — rotating to next key…[/yellow]"
+                    )
                     errors.append(f"{self._labels[idx]}: tool_use_failed")
                     continue
                 if _is_openrouter_loop_error(exc):
-                    log.warn(f"{self._model} {self._labels[idx]} OpenRouter loop-detection triggered — retrying with bypass tag…")
+                    console.print(
+                        f"[yellow]{self._model} {self._labels[idx]} "
+                        f"OpenRouter loop-detection triggered — retrying with bypass tag…[/yellow]"
+                    )
                     try:
                         patched = _append_loop_bypass(list(messages))
                         result = self._llms[idx].invoke(patched, **kwargs)
@@ -343,7 +351,7 @@ class RotatingLLM:
                             in_t, out_t = extract_tokens(result, patched)
                             token_tracker.record_usage(self._model, in_t, out_t)
                         except Exception as tracker_exc:
-                            pass
+                            console.print(f"[dim yellow]Token tracking error: {tracker_exc}[/dim yellow]")
                             
                         return result
                     except Exception as inner_exc:
@@ -351,7 +359,10 @@ class RotatingLLM:
                         continue
                 
                 if self.fallback_llm:
-                    log.warn(f"Model '{self._model}' failed with non-rotatable error: {exc}. Falling back to model '{self.fallback_llm._model}'...")
+                    console.print(
+                        f"[bold yellow]Model '{self._model}' failed with non-rotatable error: {exc}. "
+                        f"Falling back to model '{self.fallback_llm._model}'...[/bold yellow]"
+                    )
                     return self.fallback_llm.invoke(messages, **kwargs)
                 raise
  
@@ -385,17 +396,25 @@ class RotatingLLM:
                 
                 self._idx = idx
             except Exception as exc:
-                from common_utils.logger import log
                 if _is_rate_limit_error(exc):
-                    log.warn(f"{self._model} {self._labels[idx]} rate-limited — trying next key…")
+                    console.print(
+                        f"\n[yellow]{self._model} {self._labels[idx]} "
+                        f"rate-limited — trying next key…[/yellow]"
+                    )
                     errors.append(f"{self._labels[idx]}: {str(exc)[:100]}")
                     continue
                 if _is_tool_call_failed_error(exc):
-                    log.warn(f"{self._model} {self._labels[idx]} tool-call format error — rotating to next key…")
+                    console.print(
+                        f"\n[yellow]{self._model} {self._labels[idx]} "
+                        f"tool-call format error — rotating to next key…[/yellow]"
+                    )
                     errors.append(f"{self._labels[idx]}: tool_use_failed")
                     continue
                 if _is_openrouter_loop_error(exc):
-                    log.warn(f"{self._model} {self._labels[idx]} OpenRouter loop-detection triggered — retrying stream with bypass tag…")
+                    console.print(
+                        f"\n[yellow]{self._model} {self._labels[idx]} "
+                        f"OpenRouter loop-detection triggered — retrying stream with bypass tag…[/yellow]"
+                    )
                     try:
                         patched = _append_loop_bypass(list(messages))
                         accumulated_content = []
@@ -423,14 +442,19 @@ class RotatingLLM:
                         continue
                 
                 if self.fallback_llm:
-                    log.warn(f"Model '{self._model}' failed with non-rotatable error: {exc}. Falling back stream to model '{self.fallback_llm._model}'...")
+                    console.print(
+                        f"\n[bold yellow]Model '{self._model}' failed with non-rotatable error: {exc}. "
+                        f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
+                    )
                     yield from self.fallback_llm.stream(messages, **kwargs)
                     return
                 raise
  
         if self.fallback_llm:
-            from common_utils.logger import log
-            log.warn(f"All keys for '{self._model}' failed. Falling back stream to model '{self.fallback_llm._model}'...")
+            console.print(
+                f"\n[bold yellow]All keys for '{self._model}' failed. "
+                f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
+            )
             yield from self.fallback_llm.stream(messages, **kwargs)
             return
 
@@ -532,10 +556,9 @@ def get_llm(model: str, temperature: float = 0, **kwargs) -> RotatingLLM:
     labels = [f"key {i+1}/{len(keys)}" for i in range(len(keys))]
 
     if len(keys) > 1:
-        from common_utils.logger import log
-        log.info(
-            f"{bare_model}: {len(keys)} API keys loaded — will rotate on rate-limit errors",
-            file_only=True
+        console.print(
+            f"[dim]{bare_model}: {len(keys)} API keys loaded — "
+            f"will rotate on rate-limit errors[/dim]"
         )
 
     if key_env not in _GLOBAL_KEY_INDICES:

@@ -74,12 +74,13 @@ class AIWrapper:
         self._mode = effective_mode
 
         # ── Rich banner ───────────────────────────────────────────────────────
-        mode_label = "agent" if effective_mode == "agent" else "llm"
+        mode_label = "[bold cyan]agent[/bold cyan]" if effective_mode == "agent" \
+                     else "[bold yellow]llm[/bold yellow]"
         tool_names = ", ".join(t.name for t in all_tools) if all_tools else "none"
-        from common_utils.logger import log
-        log.info(
-            f"AIWrapper initialized: mode={mode_label}  model={config.model}  tools={tool_names or 'none'}",
-            file_only=True
+        console.print(
+            f"  [dim]AIWrapper[/dim] mode={mode_label}  "
+            f"model=[magenta]{config.model}[/magenta]  "
+            f"tools=[green]{tool_names or 'none'}[/green]"
         )
 
         # ── Build memory ──────────────────────────────────────────────────────

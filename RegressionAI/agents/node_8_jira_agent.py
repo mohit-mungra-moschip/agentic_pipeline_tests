@@ -39,8 +39,6 @@ def _get_jira_client():
     if not JIRA_PASSWORD:
         raise ValueError("JIRA_PASSWORD not configured in .env or environment")
     
-    # Safe debugging info for user verification in CI logs
-    console.print(f"   [dim]Jira: Connecting to {JIRA_SERVER} as {JIRA_USERNAME} (API Token length: {len(JIRA_PASSWORD)})[/dim]")
     return JIRA(options={"server": JIRA_SERVER}, basic_auth=(JIRA_USERNAME, JIRA_PASSWORD))
 
 
@@ -67,7 +65,6 @@ def _add_to_sprint(jira, issue_key: str):
             
             if active:
                 jira.add_issues_to_sprint(active.id, [issue_key])
-                console.print(f"   Sprint: Added to '{active.name}'")
             else:
                 log.warning(f"No active sprint found on board '{board_name}' (configured name: '{sprint_name}')")
     except Exception as exc:
@@ -85,13 +82,11 @@ def _assign_issue(jira, issue_key: str, assignee_email: str):
     if target:
         try:
             jira.assign_issue(issue_key, target)
-            console.print(f"   Assignee: {target}")
             return
         except Exception as exc:
             log.warning(f"Failed to assign {issue_key} to {target}: {exc}")
             if target != ASSIGNEE_EMAIL and ASSIGNEE_EMAIL:
                 try:
-                    console.print(f"   Fallback assignee: {ASSIGNEE_EMAIL}")
                     jira.assign_issue(issue_key, ASSIGNEE_EMAIL)
                 except Exception as exc2:
                     log.warning(f"Failed fallback assignment to {ASSIGNEE_EMAIL}: {exc2}")
@@ -200,21 +195,27 @@ def _create_failure_ticket(
                 review_t = next((t for t in transitions if "review" in t["name"].lower()), None)
                 if review_t:
                     jira.transition_issue(issue, review_t["id"])
-                    console.print(f"   → Transitioned {issue.key} to {review_t['name']} (healed)")
                 else:
                     # Fallback to Done if no Review transition exists in workflow
                     done_t = next((t for t in transitions if t["name"].lower() in ("done", "closed", "resolved")), None)
                     if done_t:
                         jira.transition_issue(issue, done_t["id"])
-                        console.print(f"   → Transitioned {issue.key} to Done (healed - fallback)")
             except Exception as te:
                 log.warning(f"Could not transition {issue.key} to In Review: {te}")
 
         _assign_issue(jira, issue.key, assignee_email)
         _add_to_sprint(jira, issue.key)
 
+        assigned_to = assignee_email or ASSIGNEE_EMAIL or "Unassigned"
+        if assigned_to.endswith(".local") or "local" in assigned_to or "regressionai" in assigned_to:
+            assigned_to = ASSIGNEE_EMAIL or "Unassigned"
+
         jira_url = f"{JIRA_SERVER}/browse/{issue.key}"
-        console.print(f"   [{heal_status}] Jira ticket: [link={jira_url}]{issue.key}[/link]")
+        if heal_status == "healed":
+            console.print(f"   [green]✔[/green] Created Healed Ticket: [bold]{issue.key}[/bold] for [cyan]{clean_name[:60]}[/cyan] (Assignee: {assigned_to})")
+        else:
+            console.print(f"   [red]✘[/red] Created Unhealed Ticket: [bold]{issue.key}[/bold] for [cyan]{clean_name[:60]}[/cyan] (Assignee: {assigned_to})")
+
         return JiraResult(
             test_name=test_name, jira_id=issue.key, jira_url=jira_url,
             status="created", bug_type=bug_type, heal_status=heal_status,
@@ -274,8 +275,12 @@ def _create_env_ticket(
         _assign_issue(jira, issue.key, assignee_email)
         _add_to_sprint(jira, issue.key)
 
+        assigned_to = assignee_email or ASSIGNEE_EMAIL or "Unassigned"
+        if assigned_to.endswith(".local") or "local" in assigned_to or "regressionai" in assigned_to:
+            assigned_to = ASSIGNEE_EMAIL or "Unassigned"
+
         jira_url = f"{JIRA_SERVER}/browse/{issue.key}"
-        console.print(f"   ENV ticket: [link={jira_url}]{issue.key}[/link]")
+        console.print(f"   [yellow]⚠[/yellow] Created ENV Ticket: [bold]{issue.key}[/bold] for [cyan]{clean_name[:60]}[/cyan] (Assignee: {assigned_to})")
         return JiraResult(
             test_name=test_name, jira_id=issue.key, jira_url=jira_url,
             status="created", bug_type="ENV_ISSUE", heal_status="env_tracked",
@@ -344,7 +349,6 @@ def jira_ticketing(state: AgentState) -> dict:
         is_healed = healing_successful
         heal_status = "healed" if is_healed else "unhealed"
 
-        console.print(f"   → [{heal_status}] Creating ticket for: [cyan]{test_name[:60]}[/cyan]")
         result = _create_failure_ticket(
             test_name=test_name,
             bug_type=bug_type,
@@ -366,8 +370,6 @@ def jira_ticketing(state: AgentState) -> dict:
             results_unhealed.append(result)
 
     # ── Tickets for ENV_ISSUE failures ──
-    if env_issues:
-        console.print(f"\n   Creating {len(env_issues)} ENV_ISSUE ticket(s)...")
     for env_issue in env_issues:
         result = _create_env_ticket(env_issue, run_id=run_id, assignee_email=target_email)
         results_unhealed.append(result)
