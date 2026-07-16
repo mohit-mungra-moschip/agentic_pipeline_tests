@@ -378,27 +378,31 @@ def _print_final_summary(state: dict, run_id: str):
     if state.get("pr_links"):
         pr_summary_lines.append(f"[cyan]🔗 Pull Request(s):[/cyan] {', '.join(state.get('pr_links'))}")
 
-    # Build the main outcome text
-    outcome_text = Text()
+    # Build the main outcome text using markup-friendly strings
+    lines = []
     if test_passed and not healed_count:
-        outcome_text.append("✅ All tests PASS! (No issues detected)\n", style="bold green")
+        lines.append("[bold green]✅ All tests PASS! (No issues detected)[/bold green]")
     elif healed or test_passed:
         attempts = max(iteration, 1)
-        outcome_text.append(f"✅ All tests PASS! Self-healing ({healing_type}) successful after {attempts} attempts.\n", style="bold green")
+        lines.append(f"[bold green]✅ All tests PASS! Self-healing ({healing_type}) successful after {attempts} attempts.[/bold green]")
     else:
-        outcome_text.append(f"❌ Pipeline complete — {failed} unhealed failure(s).\n", style="bold red")
+        lines.append(f"[bold red]❌ Pipeline complete — {failed} unhealed failure(s).[/bold red]")
         
-    outcome_text.append(f"📊 Test Summary: [bold]{total}[/bold] Total | [bold green]{passed} Passed[/bold green] | [bold red]{failed} Failed[/bold red]", style="white")
+    summary_line = f"📊 Test Summary: [bold]{total}[/bold] Total | [bold green]{passed} Passed[/bold green] | [bold red]{failed} Failed[/bold red]"
     if healed_count:
-        outcome_text.append(f" | [bold green]{healed_count} Healed[/bold green]", style="white")
+        summary_line += f" | [bold green]{healed_count} Healed[/bold green]"
     if skipped:
-        outcome_text.append(f" | [bold yellow]{skipped} Skipped[/bold yellow]", style="white")
-    outcome_text.append("\n")
+        summary_line += f" | [bold yellow]{skipped} Skipped[/bold yellow]"
+    lines.append(summary_line)
     
-    for line in jira_summary_lines:
-        outcome_text.append(f"\n{line}")
-    for line in pr_summary_lines:
-        outcome_text.append(f"\n{line}")
+    if jira_summary_lines:
+        lines.append("")
+        lines.extend(jira_summary_lines)
+    if pr_summary_lines:
+        lines.append("")
+        lines.extend(pr_summary_lines)
+        
+    outcome_text = Text.from_markup("\n".join(lines))
         
     panel = Panel(
         outcome_text,
