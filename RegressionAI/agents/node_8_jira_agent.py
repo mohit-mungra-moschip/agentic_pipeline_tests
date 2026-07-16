@@ -151,7 +151,15 @@ def _create_failure_ticket(
 
         # Differentiate healed vs unhealed in the title and description
         healed_badge  = "AI-Healed" if heal_status == "healed" else "Unhealed"
-        issue_summary = f"[RegressionAI] {bug_type} {healed_badge} | {test_name[:80]}"
+        
+        # Clean test name path (remove test_framework/tests/ or tests/ prefixes)
+        clean_name = test_name
+        for prefix in ["test_framework/tests/", "tests/"]:
+            if clean_name.startswith(prefix):
+                clean_name = clean_name[len(prefix):]
+                break
+                
+        issue_summary = f"[AI] [{bug_type}] {healed_badge} | {clean_name[:80]}"
 
         repo = os.getenv("GITHUB_REPOSITORY", "mohit-mungra-moschip/agentic_pipeline")
         server_url = os.getenv("GITHUB_SERVER_URL", "https://github.com")
@@ -248,9 +256,16 @@ def _create_env_ticket(
             f"_Ticket auto-created by RegressionAI pipeline._"
         )
 
+        # Clean test name path (remove test_framework/tests/ or tests/ prefixes)
+        clean_name = test_name
+        for prefix in ["test_framework/tests/", "tests/"]:
+            if clean_name.startswith(prefix):
+                clean_name = clean_name[len(prefix):]
+                break
+
         issue = jira.create_issue(
             project=JIRA_PROJECT,
-            summary=f"[RegressionAI] ENV_ISSUE | {test_name[:90]}",
+            summary=f"[AI] [ENV_ISSUE] | {clean_name[:90]}",
             description=description,
             issuetype={"name": "Task"},
             priority={"name": "High"},
