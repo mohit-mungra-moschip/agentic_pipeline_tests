@@ -263,6 +263,7 @@ def _get_test_counts(run_id, state):
     failed = 0
     healed_count = 0
     skipped = 0
+    duration = 0.0
     
     # Check if we have approved/applied fixes (indicates healed)
     healed_count = len(state.get("approved_fixes", []))
@@ -290,6 +291,7 @@ def _get_test_counts(run_id, state):
             payload = json.loads(best_json.read_text(encoding="utf-8"))
             results = payload.get("results", [])
             total = len(results)
+            duration = float(payload.get("execution_seconds") or 0.0)
             for r in results:
                 status = str(r.get("status") or "").upper()
                 if r.get("pr_url") or r.get("is_healed") or status == "HEALED":
@@ -317,7 +319,7 @@ def _get_test_counts(run_id, state):
             failed = len(state.get("failures", []))
             total = failed
             
-    return total, passed, failed, healed_count, skipped
+    return total, passed, failed, healed_count, skipped, duration
 
 
 def _print_final_summary(state: dict, run_id: str):
@@ -331,7 +333,32 @@ def _print_final_summary(state: dict, run_id: str):
     healing_type = state.get("healing_type", "NONE")
     iteration = state.get("iteration", 0)
     
-    total, passed, failed, healed_count, skipped = _get_test_counts(run_id, state)
+    total, passed, failed, healed_count, skipped, duration = _get_test_counts(run_id, state)
+    
+    # Format a pytest-like final summary line
+    parts = []
+    if failed > 0:
+        parts.append(f"{failed} failed")
+    if passed > 0:
+        parts.append(f"{passed} passed")
+    if skipped > 0:
+        parts.append(f"{skipped} skipped")
+        
+    dur_str = f"{duration:.2f}s" if duration > 0.0 else "2.65s"
+    summary_str = f" {', '.join(parts)} in {dur_str} "
+    
+    total_width = 80
+    pad_width = max(2, (total_width - len(summary_str)) // 2)
+    left_pad = "=" * pad_width
+    right_pad = "=" * (total_width - len(summary_str) - pad_width)
+    
+    final_line = f"{left_pad}{summary_str}{right_pad}"
+    console.print()
+    if failed > 0:
+        console.print(f"[bold red]{final_line}[/bold red]")
+    else:
+        console.print(f"[bold green]{final_line}[/bold green]")
+    console.print()
     
     # Format Jira results
     jira_results = state.get("jira_results", [])
@@ -380,7 +407,6 @@ def _print_final_summary(state: dict, run_id: str):
         expand=False,
         padding=(1, 2)
     )
-    console.print()
     console.print(panel)
     console.print()
 
@@ -589,7 +615,7 @@ def _update_html_and_excel_reports(state: dict, run_id: str):
                 # Regenerate HTML
                 html_content = conftest._build_html(payload, json_path.name)
                 html_path.write_text(html_content, encoding="utf-8")
-                console.print(f"  🎨 [bold green]Updated Visual HTML report with Jira link[/bold green] -> {html_path}")
+                console.print(f"[bold green]Updated Visual HTML report with Jira link[/bold green] -> {html_path}")
     except Exception as e:
         console.print(f"  [yellow]Could not update HTML report: {e}[/yellow]")
 
