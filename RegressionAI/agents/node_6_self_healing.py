@@ -884,6 +884,12 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
             internal_attempt += 1
 
     if healing_successful:
+        # If the last verification run was a partial run (e.g. TEST_HEAL or MIXED),
+        # run a final full suite verification to refresh and populate the full 51-test report.
+        if final_healing_type != "APP_HEAL":
+            console.print("   [cyan]Refreshing complete test suite results to generate full report...[/cyan]")
+            _run_full_suite(project_path, test_command)
+
         console.print(f"   [bold green]✅ All tests PASS! Self-healing ({final_healing_type}) successful after {internal_attempt + 1} attempts.[/bold green]")
         
         # Filter out successfully healed env issues from the returned env_issues list
