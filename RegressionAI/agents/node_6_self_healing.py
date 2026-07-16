@@ -884,7 +884,7 @@ Return fixes as JSON array. For TEST_BUG: fix the test file. For APP_BUG: fix th
             internal_attempt += 1
 
     if healing_successful:
-        console.print(f"   [bold green]All tests PASS! Self-healing ({final_healing_type}) successful after {internal_attempt + 1} attempts.[/bold green]")
+        console.print(f"   [bold green]✅ All tests PASS! Self-healing ({final_healing_type}) successful after {internal_attempt + 1} attempts.[/bold green]")
         
         # Filter out successfully healed env issues from the returned env_issues list
         healed_test_names = {f.get("test_name") for f in failures}

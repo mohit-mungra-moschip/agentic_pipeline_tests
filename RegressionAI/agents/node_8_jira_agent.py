@@ -150,7 +150,7 @@ def _create_failure_ticket(
         jira_priority = {"Critical": "Highest", "High": "High", "Medium": "Medium", "Low": "Low"}.get(priority, "Medium")
 
         # Differentiate healed vs unhealed in the title and description
-        healed_badge  = "AI-Healed" if heal_status == "healed" else "Unhealed"
+        healed_badge  = "✅ AI-Healed" if heal_status == "healed" else "❌ Unhealed"
         
         # Clean test name path (remove test_framework/tests/ or tests/ prefixes)
         clean_name = test_name
@@ -159,7 +159,7 @@ def _create_failure_ticket(
                 clean_name = clean_name[len(prefix):]
                 break
                 
-        issue_summary = f"[AI] [{bug_type}] {healed_badge} | {clean_name[:80]}"
+        issue_summary = f"🤖 [{bug_type}] {healed_badge} | {clean_name[:80]}"
 
         repo = os.getenv("GITHUB_REPOSITORY", "mohit-mungra-moschip/agentic_pipeline")
         server_url = os.getenv("GITHUB_SERVER_URL", "https://github.com")
@@ -265,7 +265,7 @@ def _create_env_ticket(
 
         issue = jira.create_issue(
             project=JIRA_PROJECT,
-            summary=f"[AI] [ENV_ISSUE] | {clean_name[:90]}",
+            summary=f"🤖 [ENV_ISSUE] | {clean_name[:90]}",
             description=description,
             issuetype={"name": "Task"},
             priority={"name": "High"},
