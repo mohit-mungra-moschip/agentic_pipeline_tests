@@ -321,8 +321,10 @@ def _get_test_counts(run_id, state):
 
 
 def _print_final_summary(state: dict, run_id: str):
+    from rich.console import Console
     from rich.panel import Panel
     from rich.text import Text
+    console = Console()
     
     healed = state.get("healing_successful", False)
     test_passed = state.get("test_passed", False)
