@@ -343,28 +343,8 @@ def _run_full_suite(project_path: str, test_command: str) -> tuple:
 
 
 def _call_llm_with_progress(func, *args, **kwargs):
-    """Run LLM call in a background thread while printing elapsed time."""
-    result_container = []
-    error_container  = []
-
-    def worker():
-        try:
-            result_container.append(func(*args, **kwargs))
-        except Exception as e:
-            error_container.append(e)
-
-    t = threading.Thread(target=worker, daemon=True)
-    t.start()
-    start = time.time()
-    while t.is_alive():
-        sys.stdout.write(f"\r   Waiting for LLM self-healing analysis... ({int(time.time()-start)}s elapsed)")
-        sys.stdout.flush()
-        time.sleep(1)
-    sys.stdout.write("\r" + " " * 60 + "\r")
-    sys.stdout.flush()
-    if error_container:
-        raise error_container[0]
-    return result_container[0]
+    """Run LLM call directly."""
+    return func(*args, **kwargs)
 
 
 # ── Main node ─────────────────────────────────────────────────────────────────

@@ -68,35 +68,8 @@ def _classify_single_failure(failure: dict) -> FailureClassification:
 
 
 def call_llm_with_progress(func, *args, **kwargs):
-    """Run LLM invocation in a background thread and print elapsed time every second in terminal."""
-    result_container = []
-    error_container = []
-    
-    def worker():
-        try:
-            res = func(*args, **kwargs)
-            result_container.append(res)
-        except Exception as e:
-            error_container.append(e)
-            
-    t = threading.Thread(target=worker)
-    t.daemon = True
-    t.start()
-    
-    start_time = time.time()
-    while t.is_alive():
-        elapsed = int(time.time() - start_time)
-        sys.stdout.write(f"\r   Waiting for LLM batch analysis... ({elapsed}s elapsed)")
-    sys.stdout.flush()
-    time.sleep(1)
-
-    # Clean output line
-    sys.stdout.write("\r" + " " * 60 + "\r")
-    sys.stdout.flush()
-
-    if error_container:
-        raise error_container[0]
-    return result_container[0]
+    """Run LLM invocation directly."""
+    return func(*args, **kwargs)
 
 
 def _classify_failures_single_chunk(failures: list) -> list:
