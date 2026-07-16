@@ -75,6 +75,40 @@ def _git_blame_file(project_path: str, file_path: str, line_number: Optional[int
     return _run_git(cmd, project_path)[:1000]  # cap at 1000 chars
 
 
+def _get_fallback_commit(app_git_dir: str, test_git_dir: str, has_test_framework: bool, rel_file_path: str) -> Optional[dict]:
+    """Helper to get the latest commit as fallback in case of analysis failure/unknown."""
+    app_log = _run_git(["git", "log", "-1", "--pretty=format:%H|%an|%ae|%ad|%s", "--date=short"], app_git_dir)
+    app_commit = None
+    if app_log and "|" in app_log:
+        parts = app_log.split("|", 4)
+        if len(parts) >= 5:
+            app_commit = {
+                "sha": parts[0].strip(),
+                "author": parts[1].strip(),
+                "author_email": parts[2].strip(),
+                "date": parts[3].strip(),
+                "message": parts[4].strip(),
+            }
+            
+    test_commit = None
+    if has_test_framework:
+        test_log = _run_git(["git", "log", "-1", "--pretty=format:%H|%an|%ae|%ad|%s", "--date=short"], test_git_dir)
+        if test_log and "|" in test_log:
+            parts = test_log.split("|", 4)
+            if len(parts) >= 5:
+                test_commit = {
+                    "sha": parts[0].strip(),
+                    "author": parts[1].strip(),
+                    "author_email": parts[2].strip(),
+                    "date": parts[3].strip(),
+                    "message": parts[4].strip(),
+                }
+
+    if rel_file_path and (rel_file_path.startswith("test_framework/") or "test" in rel_file_path):
+        return test_commit or app_commit
+    return app_commit or test_commit
+
+
 def root_cause_commit_analysis(state: AgentState) -> dict:
     """
     Root Cause Commit Analysis Node.
@@ -174,6 +208,7 @@ GIT BLAME OUTPUT (failing file):
         date_str = "unknown"
         commit_msg = parsed.get("commit_message", "unknown")
         
+        has_real_commit = False
         if sha != "unknown" and len(sha) >= 7:
             # Try to search in App repository first
             git_info = _run_git(["git", "log", "-1", "--pretty=format:%an|%ae|%ad|%B", "--date=short", sha], app_git_dir)
@@ -189,6 +224,17 @@ GIT BLAME OUTPUT (failing file):
                     author_email = parts[1].strip()
                     date_str = parts[2].strip()
                     commit_msg = parts[3].strip()
+                    has_real_commit = True
+
+        # Fallback to the latest commit if unknown or not a real commit (e.g. shallow boundary)
+        if not has_real_commit:
+            fallback = _get_fallback_commit(app_git_dir, test_git_dir, has_test_framework, rel_file_path)
+            if fallback:
+                sha = fallback["sha"]
+                author = fallback["author"]
+                author_email = fallback["author_email"]
+                date_str = fallback["date"]
+                commit_msg = fallback["message"]
 
         result = RootCauseResult(
             commit_sha=sha,
@@ -208,15 +254,29 @@ GIT BLAME OUTPUT (failing file):
 
     except Exception as exc:
         log.warning(f"Root cause analysis failed: {exc}")
-        result = RootCauseResult(
-            commit_sha="unknown",
-            commit_message="Could not determine",
-            author="unknown",
-            author_email="",
-            date="unknown",
-            changed_files=[],
-            analysis=f"Analysis failed: {str(exc)[:200]}",
-            confidence=10,
-        )
+        # Fallback to the latest commit
+        fallback = _get_fallback_commit(app_git_dir, test_git_dir, has_test_framework, rel_file_path)
+        if fallback:
+            result = RootCauseResult(
+                commit_sha=fallback["sha"],
+                commit_message=fallback["message"],
+                author=fallback["author"],
+                author_email=fallback["author_email"],
+                date=fallback["date"],
+                changed_files=[],
+                analysis=f"Analysis failed: {str(exc)[:100]}. Fell back to latest commit.",
+                confidence=30,
+            )
+        else:
+            result = RootCauseResult(
+                commit_sha="unknown",
+                commit_message="Could not determine",
+                author="unknown",
+                author_email="",
+                date="unknown",
+                changed_files=[],
+                analysis=f"Analysis failed: {str(exc)[:200]}",
+                confidence=10,
+            )
 
     return {"root_cause": result, "status": "self_healing"}
