@@ -304,16 +304,15 @@ class RotatingLLM:
 
     # ------------------------------------------------------------------
     def invoke(self, messages, **kwargs):
-        errors: List[str] = []
+        errors = []
         n = len(self._llms)
 
         for attempt in range(n):
             idx = (self._idx + attempt) % n
             try:
                 result = self._llms[idx].invoke(messages, **kwargs)
-                self._idx = idx           # remember the working key
+                self._idx = idx
                 
-                # Record token usage
                 try:
                     from common_utils.token_tracker import token_tracker, extract_tokens
                     in_t, out_t = extract_tokens(result, messages)
@@ -347,7 +346,6 @@ class RotatingLLM:
                         result = self._llms[idx].invoke(patched, **kwargs)
                         self._idx = idx
                         
-                        # Record token usage
                         try:
                             from common_utils.token_tracker import token_tracker, extract_tokens
                             in_t, out_t = extract_tokens(result, patched)
@@ -360,7 +358,6 @@ class RotatingLLM:
                         errors.append(f"{self._labels[idx]}: loop-bypass failed: {str(inner_exc)[:100]}")
                         continue
                 
-                # Non-rotatable error (like 413 request too large, or other exceptions)
                 if self.fallback_llm:
                     console.print(
                         f"[bold yellow]Model '{self._model}' failed with non-rotatable error: {exc}. "
@@ -379,8 +376,8 @@ class RotatingLLM:
         raise RuntimeError(self._exhausted_msg(errors))
 
     # ------------------------------------------------------------------
-    def stream(self, messages, **kwargs) -> Iterator:
-        errors: List[str] = []
+    def stream(self, messages, **kwargs):
+        errors = []
         n = len(self._llms)
 
         for attempt in range(n):
@@ -397,8 +394,8 @@ class RotatingLLM:
                         accumulated_content.append(str(chunk))
                     yield chunk
                 
-                self._idx = idx           # remember the working key
-                            except Exception as exc:
+                self._idx = idx
+            except Exception as exc:
                 if _is_rate_limit_error(exc):
                     console.print(
                         f"\n[yellow]{self._model} {self._labels[idx]} "
@@ -431,10 +428,9 @@ class RotatingLLM:
                             yield chunk
                         self._idx = idx
                         
-                        # Record token usage
                         try:
                             from common_utils.token_tracker import token_tracker, extract_tokens
-                            full_content = "".join(accumulated_content)
+                            full_content = ''.join(accumulated_content)
                             in_t, out_t = extract_tokens(last_chunk or full_content, patched)
                             token_tracker.record_usage(self._model, in_t, out_t)
                         except Exception as tracker_exc:
@@ -445,7 +441,6 @@ class RotatingLLM:
                         errors.append(f"{self._labels[idx]}: loop-bypass stream failed: {str(inner_exc)[:100]}")
                         continue
                 
-                # Non-rotatable error
                 if self.fallback_llm:
                     console.print(
                         f"\n[bold yellow]Model '{self._model}' failed with non-rotatable error: {exc}. "
@@ -461,23 +456,10 @@ class RotatingLLM:
                 f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
             )
             yield from self.fallback_llm.stream(messages, **kwargs)
-            returnk_llm._model}'...[/bold yellow]"
-                    )
-                    yield from self.fallback_llm.stream(messages, **kwargs)
-                    return
-                raise
-
-        if self.fallback_llm:
-            console.print(
-                f"\n[bold yellow]⚠️  All keys for '{self._model}' failed. "
-                f"Falling back stream to model '{self.fallback_llm._model}'...[/bold yellow]"
-            )
-            yield from self.fallback_llm.stream(messages, **kwargs)
             return
 
         raise RuntimeError(self._exhausted_msg(errors))
 
-    # ------------------------------------------------------------------
     def _exhausted_msg(self, errors: List[str]) -> str:
         n = len(self._llms)
         lines = "\n".join(f"    {e}" for e in errors)
