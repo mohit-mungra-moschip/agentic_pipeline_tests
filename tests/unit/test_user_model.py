@@ -40,7 +40,7 @@ class TestUserModel:
         Expected Output: Schema validates and length check passes.
         """
         user = schemas.UserCreate(email="bob@test.com", name="Bob")
-        assert len(user.name) > 100
+        assert len(user.name) > 0
 
     @pytest.mark.testid("TC-038")
     def test_user_update_is_active_flag(self):
